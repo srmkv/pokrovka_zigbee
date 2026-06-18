@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git --version)",
+      "Bash(grep -vE '^\\\\s*#|^\\\\s*$' .gitignore)",
+      "Bash(git config *)",
+      "Bash(sudo -S systemctl cat pokrovka-bot.service)"
+    ]
+  }
+}

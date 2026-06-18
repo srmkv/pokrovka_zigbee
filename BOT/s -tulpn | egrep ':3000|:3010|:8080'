@@ -1,0 +1,39 @@
+● pokrovka-api.service - Pokrovka API (DEMO_endpoint on :3010)
+     Loaded: loaded (/etc/systemd/system/pokrovka-api.service; enabled; vendor preset: enabled)
+     Active: activating (auto-restart) (Result: exit-code) since Sun 2025-09-21 23:33:59 MSK; 75ms ago
+    Process: 245161 ExecStart=/usr/bin/node server.js [0;1;31m(code=exited, status=217/USER)[0m
+   Main PID: 245161 (code=exited, status=217/USER)
+
+Sep 21 23:34:01 ruvds-lhu4y systemd[1]: pokrovka-api.service: Scheduled restart job, restart counter is at 1.
+Sep 21 23:34:01 ruvds-lhu4y systemd[1]: Stopped Pokrovka API (DEMO_endpoint on :3010).
+Sep 21 23:34:01 ruvds-lhu4y systemd[1]: Started Pokrovka API (DEMO_endpoint on :3010).
+Sep 21 23:34:01 ruvds-lhu4y systemd[245174]: [0;1;31m[0;1;39m[0;1;31mpokrovka-api.service: Failed to determine user credentials: No such process[0m
+Sep 21 23:34:01 ruvds-lhu4y systemd[245174]: [0;1;31m[0;1;39m[0;1;31mpokrovka-api.service: Failed at step USER spawning /usr/bin/node: No such process[0m
+Sep 21 23:34:01 ruvds-lhu4y systemd[1]: [0;1;39m[0;1;31m[0;1;39mpokrovka-api.service: Main process exited, code=exited, status=217/USER[0m
+Sep 21 23:34:01 ruvds-lhu4y systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mpokrovka-api.service: Failed with result 'exit-code'.[0m
+
+● pokrovka-bot.service - Pokrovka Bot (WebSocket relay + Telegram) on :8080
+     Loaded: loaded (/etc/systemd/system/pokrovka-bot.service; enabled; vendor preset: enabled)
+     Active: activating (auto-restart) (Result: resources) since Sun 2025-09-21 23:34:06 MSK; 206ms ago
+
+Sep 21 23:34:06 ruvds-lhu4y systemd[1]: [0;1;31m[0;1;39m[0;1;31mFailed to start Pokrovka Bot (WebSocket relay + Telegram) on :8080.[0m
+Sep 21 23:34:08 ruvds-lhu4y systemd[1]: pokrovka-bot.service: Scheduled restart job, restart counter is at 4.
+Sep 21 23:34:08 ruvds-lhu4y systemd[1]: Stopped Pokrovka Bot (WebSocket relay + Telegram) on :8080.
+Sep 21 23:34:08 ruvds-lhu4y systemd[1]: [0;1;31m[0;1;39m[0;1;31mpokrovka-bot.service: Failed to load environment files: No such file or directory[0m
+Sep 21 23:34:08 ruvds-lhu4y systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mpokrovka-bot.service: Failed to run 'start' task: No such file or directory[0m
+Sep 21 23:34:08 ruvds-lhu4y systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mpokrovka-bot.service: Failed with result 'resources'.[0m
+Sep 21 23:34:08 ruvds-lhu4y systemd[1]: [0;1;31m[0;1;39m[0;1;31mFailed to start Pokrovka Bot (WebSocket relay + Telegram) on :8080.[0m
+
+● pokrovka-frontend.service - Pokrovka Frontend (React dev server on :3000)
+     Loaded: loaded (/etc/systemd/system/pokrovka-frontend.service; enabled; vendor preset: enabled)
+     Active: activating (auto-restart) (Result: exit-code) since Sun 2025-09-21 23:34:06 MSK; 2s ago
+    Process: 245179 ExecStart=/usr/bin/npm run start [0;1;31m(code=exited, status=217/USER)[0m
+   Main PID: 245179 (code=exited, status=217/USER)
+
+Sep 21 23:34:09 ruvds-lhu4y systemd[1]: pokrovka-frontend.service: Scheduled restart job, restart counter is at 3.
+Sep 21 23:34:09 ruvds-lhu4y systemd[1]: Stopped Pokrovka Frontend (React dev server on :3000).
+Sep 21 23:34:09 ruvds-lhu4y systemd[1]: Started Pokrovka Frontend (React dev server on :3000).
+Sep 21 23:34:09 ruvds-lhu4y systemd[245184]: [0;1;31m[0;1;39m[0;1;31mpokrovka-frontend.service: Failed to determine user credentials: No such process[0m
+Sep 21 23:34:09 ruvds-lhu4y systemd[245184]: [0;1;31m[0;1;39m[0;1;31mpokrovka-frontend.service: Failed at step USER spawning /usr/bin/npm: No such process[0m
+Sep 21 23:34:09 ruvds-lhu4y systemd[1]: [0;1;39m[0;1;31m[0;1;39mpokrovka-frontend.service: Main process exited, code=exited, status=217/USER[0m
+Sep 21 23:34:09 ruvds-lhu4y systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mpokrovka-frontend.service: Failed with result 'exit-code'.[0m

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "sensor-bathroom",
+    "name": "Ванная",
+    "location": "Ванная",
+    "type": "leak",
+    "deviceId": "bathroom-leak-uno",
+    "icon": "drop",
+    "resettable": true,
+    "ip": "",
+    "mac": "",
+    "firmwareVersion": "",
+    "isBuiltIn": true,
+    "legacyKey": "leakSensor",
+    "createdAt": "static",
+    "isActive": true
+  },
+  {
+    "id": "sensor-washing-machine",
+    "name": "Стиральная машина",
+    "location": "Прачечная / ванная",
+    "type": "leak",
+    "deviceId": "washing-machine-leak-uno",
+    "icon": "washing-machine",
+    "resettable": true,
+    "ip": "",
+    "mac": "",
+    "firmwareVersion": "",
+    "isBuiltIn": true,
+    "legacyKey": "washingMachineSensor",
+    "createdAt": "static",
+    "isActive": true
+  },
+  {
+    "id": "sensor-dishwasher",
+    "name": "Посудомойка",
+    "location": "Кухня",
+    "type": "leak",
+    "deviceId": "dishwasher-leak-uno",
+    "icon": "dishwasher",
+    "resettable": true,
+    "ip": "",
+    "mac": "",
+    "firmwareVersion": "",
+    "isBuiltIn": true,
+    "legacyKey": "dishwasherSensor",
+    "createdAt": "static",
+    "isActive": true
+  }
+]
