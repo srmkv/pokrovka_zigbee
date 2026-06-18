@@ -1,6 +1,8 @@
 // src/hooks/useOpenMeteo.ts
 import { useEffect, useMemo, useState } from "react";
 
+const API_BASE = (process.env.REACT_APP_API_BASE || "/api").replace(/\/$/, "");
+
 // Почасовая точка
 export type WeatherPoint = {
   time: string;                 // ISO в вашей таймзоне
@@ -102,7 +104,7 @@ export function useOpenMeteo(lat: number, lon: number, hours = 48, days = 7) {
       past_days: "0",
     });
 
-    return `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+    return `${API_BASE}/weather/forecast?${params.toString()}`;
   }, [lat, lon, days]);
 
   useEffect(() => {

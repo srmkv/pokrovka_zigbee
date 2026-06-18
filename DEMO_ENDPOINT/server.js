@@ -2688,6 +2688,42 @@ app.post("/api/vpn/down", async (req, res) => {
   }
 });
 
+// ===== Прокси погоды (open-meteo) — внешние запросы идут с бэкенда, web ходит сюда =====
+const WEATHER_CACHE = new Map();
+function rawQuery(req) {
+  const i = req.url.indexOf("?");
+  return i >= 0 ? req.url.slice(i + 1) : "";
+}
+async function proxyWeather(upstreamBase, qs, ttlMs) {
+  const key = `${upstreamBase}?${qs}`;
+  const cached = WEATHER_CACHE.get(key);
+  if (cached && Date.now() - cached.at < ttlMs) return cached.data;
+  const resp = await fetch(key, { timeout: 10000 });
+  if (!resp.ok) throw new Error(`upstream HTTP ${resp.status}`);
+  const data = await resp.json();
+  WEATHER_CACHE.set(key, { at: Date.now(), data });
+  if (WEATHER_CACHE.size > 50) WEATHER_CACHE.delete(WEATHER_CACHE.keys().next().value);
+  return data;
+}
+
+app.get("/api/weather/forecast", async (req, res) => {
+  try {
+    const data = await proxyWeather("https://api.open-meteo.com/v1/forecast", rawQuery(req), 3 * 60 * 1000);
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: e.message || String(e) });
+  }
+});
+
+app.get("/api/weather/air-quality", async (req, res) => {
+  try {
+    const data = await proxyWeather("https://air-quality-api.open-meteo.com/v1/air-quality", rawQuery(req), 5 * 60 * 1000);
+    res.json(data);
+  } catch (e) {
+    res.status(502).json({ error: e.message || String(e) });
+  }
+});
+
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
 app.listen(PORT, HOST, () => {

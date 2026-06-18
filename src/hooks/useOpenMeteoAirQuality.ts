@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
+const API_BASE = (process.env.REACT_APP_API_BASE || "/api").replace(/\/$/, "");
+
 type AirState = {
   loading: boolean;
   error?: string;
@@ -25,7 +27,7 @@ export function useOpenMeteoAirQuality(lat: number, lon: number) {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Moscow",
       current: ["european_aqi", "pm2_5", "pm10"].join(","),
     });
-    return `https://air-quality-api.open-meteo.com/v1/air-quality?${params.toString()}`;
+    return `${API_BASE}/weather/air-quality?${params.toString()}`;
   }, [lat, lon]);
 
   useEffect(() => {
