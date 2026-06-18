@@ -70,6 +70,7 @@ type ZigbeeDevice = {
     exposes?: ZigbeeExpose[];
   };
   state?: Record<string, unknown>;
+  notify?: boolean;
 };
 
 type ZigbeeStatus = {
@@ -1053,7 +1054,7 @@ function ImportantStateGrid({ device, profile }: { device: ZigbeeDevice; profile
   );
 }
 
-function ZigbeeDeviceCard({ device, advanced, onCommand }: { device: ZigbeeDevice; advanced: boolean; onCommand: (friendlyName: string, payload: Record<string, unknown>) => Promise<void> }) {
+function ZigbeeDeviceCard({ device, advanced, onCommand, onSetNotify }: { device: ZigbeeDevice; advanced: boolean; onCommand: (friendlyName: string, payload: Record<string, unknown>) => Promise<void>; onSetNotify: (friendlyName: string, enabled: boolean) => Promise<void> }) {
   const [raw, setRaw] = useState("{}");
   const [busy, setBusy] = useState(false);
   const [rawError, setRawError] = useState<string | null>(null);
@@ -1130,6 +1131,18 @@ function ZigbeeDeviceCard({ device, advanced, onCommand }: { device: ZigbeeDevic
         </div>
       )}
 
+      {!isCoordinator && (
+        <label className="mt-3 flex cursor-pointer select-none items-center gap-2 text-xs text-gray-400">
+          <input
+            type="checkbox"
+            checked={!!device.notify}
+            onChange={(e) => { onSetNotify(device.friendlyName, e.target.checked).catch(() => {}); }}
+            className="h-4 w-4 shrink-0 accent-blue-600"
+          />
+          Оповещать в Telegram о смене состояния
+        </label>
+      )}
+
       {advanced && !isCoordinator && (
         <div className="mt-3 space-y-3 rounded-xl border border-[#2a2b46] bg-[#111322] p-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Расширенный режим</div>
@@ -1185,11 +1198,71 @@ function actionValuesForDevice(device?: ZigbeeDevice): string[] {
   return Array.from(new Set(fromCtrl.map(String).filter(Boolean)));
 }
 
-function isActionSource(device: ZigbeeDevice): boolean {
+// Бинарные ключи-события датчиков: [метка для true, метка для false]
+const LINK_BINARY_EVENTS: Record<string, [string, string]> = {
+  occupancy: ["Движение появилось", "Движение пропало"],
+  presence: ["Присутствие появилось", "Присутствие пропало"],
+  contact: ["Закрылось", "Открылось"],
+  water_leak: ["Протечка", "Сухо"],
+  smoke: ["Задымление", "Норма"],
+  gas: ["Утечка газа", "Норма"],
+  vibration: ["Вибрация", "Покой"],
+  tamper: ["Вскрытие", "OK"],
+  carbon_monoxide: ["Угарный газ", "Норма"],
+};
+
+// Все ключи, по которым устройство может быть источником события.
+function deviceEventKeys(device?: ZigbeeDevice): string[] {
+  if (!device) return [];
+  const keys = new Set<string>();
+  (device.controls || []).forEach((c) => { if (c.property) keys.add(c.property.toLowerCase()); });
+  Object.keys(device.state || {}).forEach((k) => { if (!k.startsWith("_")) keys.add(k.toLowerCase()); });
+  return Array.from(keys);
+}
+
+// Любой датчик/устройство, которое может быть триггером (кнопка, датчик, реле/кран по state).
+function isEventSource(device: ZigbeeDevice): boolean {
+  if (device.friendlyName === "Coordinator") return false;
   const kind = inferDeviceProfile(device).kind;
   if (kind === "button" || kind === "switch") return true;
-  if (actionValuesForDevice(device).length > 0) return true;
-  return getDeviceControls(device).some((c) => c.property.toLowerCase() === "action");
+  const keys = deviceEventKeys(device);
+  if (keys.includes("action")) return true;
+  if (Object.keys(LINK_BINARY_EVENTS).some((k) => keys.includes(k))) return true;
+  return keys.includes("state");
+}
+
+// Варианты «событий» источника для выпадающего списка.
+function eventOptionsForDevice(device?: ZigbeeDevice): Array<{ value: string; label: string }> {
+  if (!device) return [{ value: "any", label: "любое событие" }];
+  const keys = deviceEventKeys(device);
+  const opts: Array<{ value: string; label: string }> = [];
+  const actions = actionValuesForDevice(device);
+  if (keys.includes("action") || actions.length) {
+    opts.push({ value: "any", label: "любое нажатие" });
+    actions.forEach((a) => opts.push({ value: a, label: actionLabel(a) }));
+  }
+  for (const k of Object.keys(LINK_BINARY_EVENTS)) {
+    if (!keys.includes(k)) continue;
+    const [onL, offL] = LINK_BINARY_EVENTS[k];
+    opts.push({ value: `${k}=true`, label: onL });
+    opts.push({ value: `${k}=false`, label: offL });
+  }
+  if (keys.includes("state")) {
+    opts.push({ value: "state=on", label: "Включился / открылся" });
+    opts.push({ value: "state=off", label: "Выключился / закрылся" });
+  }
+  if (!opts.length) opts.push({ value: "any", label: "любое событие" });
+  return opts;
+}
+
+function formatEventToken(token: string): string {
+  if (!token || token === "any") return "любое событие";
+  if (!token.includes("=")) return actionLabel(token);
+  const [k, v] = token.split("=");
+  const pair = LINK_BINARY_EVENTS[k];
+  if (pair) return v === "true" ? pair[0] : pair[1];
+  if (k === "state") return v === "on" ? "Включился / открылся" : "Выключился / закрылся";
+  return `${k}=${v}`;
 }
 
 function isControllableTarget(device: ZigbeeDevice): boolean {
@@ -1241,12 +1314,12 @@ function DeviceLinksSection({ devices }: { devices: ZigbeeDevice[] }) {
   const [targetFn, setTargetFn] = useState("");
   const [command, setCommand] = useState("toggle");
 
-  const sources = devices.filter(isActionSource);
+  const sources = devices.filter(isEventSource);
   const targets = devices.filter(isControllableTarget);
   const byName = (fn: string) => devices.find((d) => d.friendlyName === fn);
   const sourceDevice = byName(sourceFn);
   const targetDevice = byName(targetFn);
-  const actionOptions = actionValuesForDevice(sourceDevice);
+  const eventOptions = eventOptionsForDevice(sourceDevice);
   const commandOptions = commandOptionsForTarget(targetDevice);
 
   async function load() {
@@ -1276,7 +1349,7 @@ function DeviceLinksSection({ devices }: { devices: ZigbeeDevice[] }) {
   }, [targetFn, devices]);
 
   useEffect(() => {
-    if (sourceAction !== "any" && !actionOptions.some((a) => a === sourceAction)) setSourceAction("any");
+    if (!eventOptions.some((o) => o.value === sourceAction)) setSourceAction(eventOptions[0]?.value || "any");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceFn, devices]);
 
@@ -1338,19 +1411,18 @@ function DeviceLinksSection({ devices }: { devices: ZigbeeDevice[] }) {
   return (
     <div className="rounded-2xl border border-[#2a2b46] bg-[#131522] p-4 shadow-sm">
       <div className="text-lg font-bold text-gray-100">Связки устройств</div>
-      <div className="mt-1 text-xs text-gray-400">Когда кнопка/выключатель присылает событие — выполнить действие на другом устройстве (например: нажатие кнопки → открыть/закрыть кран).</div>
+      <div className="mt-1 text-xs text-gray-400">Когда датчик или кнопка присылает событие (движение, открытие, протечка, нажатие…) — выполнить действие на другом устройстве. Например: движение → включить реле, или нажатие кнопки → открыть/закрыть кран.</div>
 
       <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto_1fr_1fr_auto] md:items-end">
         <label className="flex flex-col gap-1 text-xs text-gray-500">Когда (источник)
           <select className={selectCls} value={sourceFn} onChange={(e) => setSourceFn(e.target.value)}>
-            {sources.length === 0 && <option value="">нет кнопок</option>}
+            {sources.length === 0 && <option value="">нет датчиков</option>}
             {sources.map((d) => <option key={d.friendlyName} value={d.friendlyName}>{deviceShortLabel(d)}</option>)}
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-gray-500">Событие
           <select className={selectCls} value={sourceAction} onChange={(e) => setSourceAction(e.target.value)}>
-            <option value="any">любое нажатие</option>
-            {actionOptions.map((a) => <option key={a} value={a}>{actionLabel(a)}</option>)}
+            {eventOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </label>
         <div className="hidden pb-2 text-center text-gray-500 md:block">→</div>
@@ -1380,7 +1452,7 @@ function DeviceLinksSection({ devices }: { devices: ZigbeeDevice[] }) {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold text-gray-100">{link.name}</div>
                   <div className="truncate text-xs text-gray-400">
-                    {src ? deviceShortLabel(src) : link.source.friendlyName} · {link.source.action === "any" ? "любое нажатие" : actionLabel(link.source.action)}
+                    {src ? deviceShortLabel(src) : link.source.friendlyName} · {formatEventToken(link.source.action)}
                     {" → "}
                     {tgt ? deviceShortLabel(tgt) : link.target.friendlyName} · {commandShortLabel(link.target.command)}
                   </div>
@@ -1484,6 +1556,17 @@ const ZigbeePanel: React.FC = () => {
     await load(true);
   }
 
+  async function setNotify(friendlyName: string, enabled: boolean) {
+    const response = await fetch(`${API_BASE}/zigbee/devices/${encodeURIComponent(friendlyName)}/notify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    showAlert({ tone: "info", title: "Оповещения", message: enabled ? "Оповещения о смене состояния включены." : "Оповещения выключены." });
+    await load(true);
+  }
+
   const filteredDevices = status.devices.filter((device) => {
     if (!query.trim()) return true;
     const controls = getDeviceControls(device).map((control) => `${control.label} ${control.property}`).join(" ");
@@ -1563,7 +1646,7 @@ const ZigbeePanel: React.FC = () => {
         <div className="rounded-2xl border border-[#2a2b46] bg-[#131522] p-5 text-gray-400">Устройств пока нет. Открой pairing и добавь первое Zigbee-устройство.</div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {filteredDevices.map((device) => <ZigbeeDeviceCard key={device.friendlyName} device={device} advanced={advanced} onCommand={sendCommand} />)}
+          {filteredDevices.map((device) => <ZigbeeDeviceCard key={device.friendlyName} device={device} advanced={advanced} onCommand={sendCommand} onSetNotify={setNotify} />)}
         </div>
       )}
     </div>

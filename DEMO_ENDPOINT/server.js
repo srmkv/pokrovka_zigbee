@@ -271,6 +271,7 @@ function defaultState() {
     rules: defaultRules(),
     deviceLinks: [],
     waterValves: {},
+    zigbeeNotify: {},
     sensorRegistry: defaultSensorRegistry(),
     sensorStates: {},
     settings: {
@@ -312,6 +313,7 @@ function loadState() {
       state.rules = mergeRules(state.rules);
       state.deviceLinks = Array.isArray(state.deviceLinks) ? state.deviceLinks : [];
       state.waterValves = (state.waterValves && typeof state.waterValves === "object" && !Array.isArray(state.waterValves)) ? state.waterValves : {};
+      state.zigbeeNotify = (state.zigbeeNotify && typeof state.zigbeeNotify === "object" && !Array.isArray(state.zigbeeNotify)) ? state.zigbeeNotify : {};
       state.sensorRegistry = mergeSensorRegistry(state.sensorRegistry);
       state.sensorStates = state.sensorStates || {};
       state.settings = {
@@ -472,9 +474,11 @@ function shouldSendTelegramForPriority(priority) {
   return !!tg.sendInfo;
 }
 
-async function sendTelegramMessage(text) {
+async function sendTelegramMessage(text, { force = false } = {}) {
   const tg = { ...defaultTelegramSettings(), ...((state.settings || {}).telegram || {}) };
-  if (!tg.enabled || !tg.botToken || !tg.chatId) return { skipped: true };
+  // force=true игнорирует глобальный тумблер enabled (для теста и явных подписок),
+  // но всё равно требует токен и chatId.
+  if (!tg.botToken || !tg.chatId || (!force && !tg.enabled)) return { skipped: true };
 
   const url = `${TELEGRAM_API_BASE}/bot${tg.botToken}/sendMessage`;
   const resp = await fetch(url, {
@@ -1581,14 +1585,19 @@ function linkCommandToPayload(command, targetFriendlyName) {
   }
 }
 
+// Бинарные ключи датчиков, по смене которых срабатывают связки.
+const LINK_BINARY_KEYS = ["occupancy", "presence", "contact", "water_leak", "smoke", "gas", "vibration", "tamper", "carbon_monoxide"];
+
 // Связки устройств: по событию (action) источника выполняем команду на цели.
 function runDeviceLinks(sourceFriendlyName, action) {
   const links = Array.isArray(state.deviceLinks) ? state.deviceLinks : [];
   for (const link of links) {
     if (!link || link.enabled === false) continue;
     if (link.source?.friendlyName !== sourceFriendlyName) continue;
+    const token = String(action || "").toLowerCase();
     const wantAction = String(link.source?.action || "any").toLowerCase();
-    if (wantAction !== "any" && wantAction !== String(action || "").toLowerCase()) continue;
+    // "any" совпадает только с событиями-нажатиями (без "="); токены датчиков (occupancy=true и т.п.) — точное совпадение.
+    if (!(wantAction === token || (wantAction === "any" && !token.includes("=")))) continue;
     const target = link.target?.friendlyName;
     if (!target) continue;
     const payload = linkCommandToPayload(link.target?.command, target);
@@ -1613,6 +1622,60 @@ function runDeviceLinks(sourceFriendlyName, action) {
         payload: { linkId: link.id, target }
       }));
   }
+}
+
+// Шумные/непрерывные ключи — по ним НЕ оповещаем (иначе спам).
+const ZIGBEE_NOISY_KEYS = new Set([
+  "linkquality", "voltage", "battery", "energy", "power", "current",
+  "temperature", "humidity", "update", "update_available", "last_seen", "elapsed", "illuminance", "illuminance_lux"
+]);
+
+const ZIGBEE_NOTIFY_LABELS = {
+  state: "Состояние", contact: "Контакт", water_leak: "Протечка", occupancy: "Движение",
+  smoke: "Дым", gas: "Газ", tamper: "Вскрытие", action: "Действие", lock_state: "Замок",
+  alarm: "Тревога", presence: "Присутствие", vibration: "Вибрация", carbon_monoxide: "Угарный газ"
+};
+
+function describeZigbeeValue(key, value) {
+  switch (key) {
+    case "contact": return value ? "закрыто" : "ОТКРЫТО";
+    case "water_leak": return value ? "⚠ ПРОТЕЧКА" : "сухо";
+    case "smoke": return value ? "⚠ ЗАДЫМЛЕНИЕ" : "норма";
+    case "gas": return value ? "⚠ УТЕЧКА ГАЗА" : "норма";
+    case "carbon_monoxide": return value ? "⚠ УГАРНЫЙ ГАЗ" : "норма";
+    case "occupancy": case "presence": return value ? "есть" : "нет";
+    case "tamper": return value ? "⚠ вскрытие" : "ок";
+    case "vibration": return value ? "⚠ вибрация" : "ок";
+    case "state": {
+      const s = String(value).toLowerCase();
+      if (["on", "open", "opened", "true"].includes(s)) return "включено/открыто";
+      if (["off", "close", "closed", "false"].includes(s)) return "выключено/закрыто";
+      return String(value);
+    }
+    default:
+      if (typeof value === "boolean") return value ? "да" : "нет";
+      return String(value);
+  }
+}
+
+// Оповещение в Telegram о смене состояния подписанного устройства.
+function handleZigbeeNotify(friendlyName, before, payload) {
+  if (!state.zigbeeNotify || !state.zigbeeNotify[friendlyName]) return;
+  const changes = [];
+  for (const [key, value] of Object.entries(payload || {})) {
+    if (key.startsWith("_") || ZIGBEE_NOISY_KEYS.has(key)) continue;
+    if (value === "" || value == null) continue;
+    const prev = before ? before[key] : undefined;
+    if (prev === undefined) continue; // не оповещаем о самом первом значении
+    if (JSON.stringify(prev) === JSON.stringify(value)) continue;
+    changes.push(`${ZIGBEE_NOTIFY_LABELS[key] || key}: ${describeZigbeeValue(key, value)}`);
+  }
+  if (!changes.length) return;
+  const z = ensureZigbeeState();
+  const dev = z.devices?.[friendlyName];
+  const name = String(dev?.definition?.description ? `${dev.definition.description} (${friendlyName})` : friendlyName).replace(/[<>]/g, "");
+  const text = `🔔 <b>${name}</b>\nСмена состояния:\n${changes.join("\n").replace(/[<>]/g, "")}\nВремя: ${new Date().toLocaleString("ru-RU")}`;
+  sendTelegramMessage(text, { force: true }).catch((e) => console.warn("Zigbee notify Telegram:", e.message));
 }
 
 function handleZigbeeMqttMessage(topic, payloadBuffer) {
@@ -1646,6 +1709,7 @@ function handleZigbeeMqttMessage(topic, payloadBuffer) {
 
     upsertZigbeeDevice({ friendly_name: friendlyName }, { lastMessageAt: nowIso() });
     if (looksLikeZigbeeStatePayload(payload)) {
+      const before = z.values[friendlyName];
       const merged = {
         ...(z.values[friendlyName] || {}),
         ...payload,
@@ -1663,8 +1727,23 @@ function handleZigbeeMqttMessage(topic, payloadBuffer) {
       z.values[friendlyName] = merged;
       touchDevice(`zigbee:${friendlyName}`, { name: friendlyName, source: "zigbee", timeoutMs: ZIGBEE_DEVICE_TIMEOUT_MS, meta: payload });
       recordZigbeeEventForHomeLog(friendlyName, payload);
+      handleZigbeeNotify(friendlyName, before, payload);
       if (actionValue != null && String(actionValue).trim() !== "") {
         runDeviceLinks(friendlyName, String(actionValue));
+      }
+      // Триггеры связок по смене состояния датчиков (движение/контакт/протечка и т.п.)
+      for (const key of LINK_BINARY_KEYS) {
+        if (!(key in payload)) continue;
+        const v = payload[key];
+        if (typeof v !== "boolean") continue;
+        const prev = before ? before[key] : undefined;
+        if (prev === v) continue;
+        runDeviceLinks(friendlyName, `${key}=${v}`);
+      }
+      if ("state" in payload && before && before.state !== undefined) {
+        const onNow = ["on", "open", "opened", "true", "1"].includes(String(payload.state).toLowerCase());
+        const onPrev = ["on", "open", "opened", "true", "1"].includes(String(before.state).toLowerCase());
+        if (onNow !== onPrev) runDeviceLinks(friendlyName, `state=${onNow ? "on" : "off"}`);
       }
     }
     z.lastSeenAt = nowIso();
@@ -1767,7 +1846,8 @@ function zigbeeStatusResponse() {
       ...device,
       state: z.values?.[device.friendlyName] || {},
       controls: zigbeeDeviceControls(device, z.values?.[device.friendlyName] || {}),
-      effectiveStatus: zigbeeDeviceRuntimeStatus(device)
+      effectiveStatus: zigbeeDeviceRuntimeStatus(device),
+      notify: !!(state.zigbeeNotify && state.zigbeeNotify[device.friendlyName])
     }))
     .sort((a, b) => String(a.friendlyName || "").localeCompare(String(b.friendlyName || ""), "ru"));
 
@@ -1846,7 +1926,13 @@ app.put("/api/settings/telegram", (req, res) => {
 
 app.post("/api/settings/telegram/test", async (req, res) => {
   try {
-    await sendTelegramMessage("✅ Тестовое сообщение от умного дома NanoPi");
+    const result = await sendTelegramMessage("✅ Тестовое сообщение от умного дома NanoPi", { force: true });
+    if (result && result.skipped) {
+      const msg = "Не заданы Bot Token или Chat ID";
+      state.settings.telegram.lastError = msg;
+      saveState();
+      return res.status(400).json({ ok: false, error: msg, settings: sanitizeTelegramSettings(state.settings.telegram) });
+    }
     state.settings.telegram.lastTestAt = nowIso();
     state.settings.telegram.lastError = null;
     saveState();
@@ -1854,7 +1940,7 @@ app.post("/api/settings/telegram/test", async (req, res) => {
   } catch (e) {
     state.settings.telegram.lastError = e.message;
     saveState();
-    res.status(502).json({ error: e.message, settings: sanitizeTelegramSettings(state.settings.telegram) });
+    res.status(502).json({ ok: false, error: e.message, settings: sanitizeTelegramSettings(state.settings.telegram) });
   }
 });
 
@@ -2471,6 +2557,18 @@ app.delete("/api/zigbee/links/:id", (req, res) => {
   state.deviceLinks = (state.deviceLinks || []).filter(l => l.id !== req.params.id);
   saveState();
   res.json({ ok: true, removed: before - state.deviceLinks.length });
+});
+
+// Подписка устройства на Telegram-оповещения о смене состояния.
+app.post("/api/zigbee/devices/:friendlyName/notify", (req, res) => {
+  const friendlyName = decodeURIComponent(req.params.friendlyName || "");
+  if (!friendlyName) return res.status(400).json({ ok: false, error: "friendlyName is required" });
+  if (!state.zigbeeNotify || typeof state.zigbeeNotify !== "object") state.zigbeeNotify = {};
+  const enabled = !!(req.body && req.body.enabled);
+  if (enabled) state.zigbeeNotify[friendlyName] = true;
+  else delete state.zigbeeNotify[friendlyName];
+  saveState();
+  res.json({ ok: true, friendlyName, enabled: !!state.zigbeeNotify[friendlyName] });
 });
 
 // ===== Привязки карточек "Водоснабжение" (общие для всех клиентов) =====

@@ -25,19 +25,26 @@ const AlarmIcon = () => (
   </svg>
 );
 
+type ZigbeeCount = { onlineDevices?: number; devicesCount?: number } | null;
+
 const HomeStatusChips: React.FC = () => {
   const [summary, setSummary] = useState<HomeSummary | null>(null);
+  const [zigbee, setZigbee] = useState<ZigbeeCount>(null);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
         const resp = await fetch(`${API_BASE}/system/summary`);
-        if (!resp.ok) throw new Error(String(resp.status));
-        const data = await resp.json();
-        if (mounted) setSummary(data);
+        if (mounted && resp.ok) setSummary(await resp.json());
       } catch {
         if (mounted) setSummary(null);
+      }
+      try {
+        const zr = await fetch(`${API_BASE}/zigbee/status`, { cache: "no-store" });
+        if (mounted && zr.ok) setZigbee(await zr.json());
+      } catch {
+        if (mounted) setZigbee(null);
       }
     }
     load();
@@ -50,21 +57,21 @@ const HomeStatusChips: React.FC = () => {
     };
   }, []);
 
-  const online = summary?.onlineDevices ?? 0;
-  const total = summary?.totalDevices ?? 0;
-  const allOnline = summary != null && online === total;
+  const online = zigbee?.onlineDevices ?? 0;
+  const total = zigbee?.devicesCount ?? 0;
+  const allOnline = zigbee != null && online === total;
   const alarms = summary?.activeLeaks ?? 0;
 
   return (
     <div className="flex items-center gap-2">
       <span
-        title="Устройства онлайн"
+        title="Zigbee-устройства онлайн"
         className={`flex items-center gap-1.5 rounded-lg border-2 px-2.5 py-1 text-sm font-semibold ${
           allOnline ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-amber-500/40 bg-amber-500/10 text-amber-200"
         }`}
       >
         <DeviceIcon />
-        {summary ? `${online}/${total}` : "—"}
+        {zigbee ? `${online}/${total}` : "—"}
       </span>
       <span
         title="Активные тревоги"
