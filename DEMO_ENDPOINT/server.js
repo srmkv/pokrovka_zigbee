@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
+// Предпочитать IPv4 при резолвинге (через VPN IPv6 часто недоступен и запросы виснут).
+try { require("dns").setDefaultResultOrder?.("ipv4first"); } catch (_) {}
 const path = require("path");
 const fetch = require("node-fetch");
 const os = require("os");
@@ -272,6 +274,7 @@ function defaultState() {
     deviceLinks: [],
     waterValves: {},
     zigbeeNotify: {},
+    irRemotes: [],
     sensorRegistry: defaultSensorRegistry(),
     sensorStates: {},
     settings: {
@@ -314,6 +317,7 @@ function loadState() {
       state.deviceLinks = Array.isArray(state.deviceLinks) ? state.deviceLinks : [];
       state.waterValves = (state.waterValves && typeof state.waterValves === "object" && !Array.isArray(state.waterValves)) ? state.waterValves : {};
       state.zigbeeNotify = (state.zigbeeNotify && typeof state.zigbeeNotify === "object" && !Array.isArray(state.zigbeeNotify)) ? state.zigbeeNotify : {};
+      state.irRemotes = Array.isArray(state.irRemotes) ? state.irRemotes : [];
       state.sensorRegistry = mergeSensorRegistry(state.sensorRegistry);
       state.sensorStates = state.sensorStates || {};
       state.settings = {
@@ -2690,20 +2694,50 @@ app.post("/api/vpn/down", async (req, res) => {
 
 // ===== Прокси погоды (open-meteo) — внешние запросы идут с бэкенда, web ходит сюда =====
 const WEATHER_CACHE = new Map();
+const WEATHER_INFLIGHT = new Map();
 function rawQuery(req) {
   const i = req.url.indexOf("?");
   return i >= 0 ? req.url.slice(i + 1) : "";
 }
+function fetchWeatherUpstream(key) {
+  // дедуп параллельных запросов одного ключа
+  if (WEATHER_INFLIGHT.has(key)) return WEATHER_INFLIGHT.get(key);
+  // Тянем через curl: на этом боксе node-fetch к api.open-meteo.com периодически
+  // зависает на чтении тела (особенность VPN/процесса), а curl стабильно отдаёт за ~0.6с.
+  const p = new Promise((resolve, reject) => {
+    execFile("curl", ["-sS", "--compressed", "--max-time", "15", "-A", "pokrovka-smarthome", key],
+      { maxBuffer: 16 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        if (err) return reject(new Error((stderr && String(stderr).trim()) || err.message));
+        try {
+          const data = JSON.parse(stdout);
+          WEATHER_CACHE.set(key, { at: Date.now(), data });
+          if (WEATHER_CACHE.size > 80) WEATHER_CACHE.delete(WEATHER_CACHE.keys().next().value);
+          resolve(data);
+        } catch (_) {
+          reject(new Error("bad json from upstream"));
+        }
+      });
+  }).finally(() => WEATHER_INFLIGHT.delete(key));
+  WEATHER_INFLIGHT.set(key, p);
+  return p;
+}
+// stale-while-revalidate: свежий кэш — сразу; устаревший — отдаём старое и обновляем в фоне;
+// нет кэша — ждём ответ; при сбое апстрима отдаём последнее, что есть в кэше.
 async function proxyWeather(upstreamBase, qs, ttlMs) {
   const key = `${upstreamBase}?${qs}`;
   const cached = WEATHER_CACHE.get(key);
-  if (cached && Date.now() - cached.at < ttlMs) return cached.data;
-  const resp = await fetch(key, { timeout: 10000 });
-  if (!resp.ok) throw new Error(`upstream HTTP ${resp.status}`);
-  const data = await resp.json();
-  WEATHER_CACHE.set(key, { at: Date.now(), data });
-  if (WEATHER_CACHE.size > 50) WEATHER_CACHE.delete(WEATHER_CACHE.keys().next().value);
-  return data;
+  if (cached) {
+    if (Date.now() - cached.at >= ttlMs) fetchWeatherUpstream(key).catch(() => {});
+    return cached.data;
+  }
+  try {
+    return await fetchWeatherUpstream(key);
+  } catch (e) {
+    const any = WEATHER_CACHE.get(key);
+    if (any) return any.data;
+    throw e;
+  }
 }
 
 app.get("/api/weather/forecast", async (req, res) => {
@@ -2722,6 +2756,222 @@ app.get("/api/weather/air-quality", async (req, res) => {
   } catch (e) {
     res.status(502).json({ error: e.message || String(e) });
   }
+});
+
+// ===== ИК-устройства (IR remotes через Zigbee ИК-бластер, напр. Moes UFO-R11) =====
+// Модель хранения: state.irRemotes = [{ id, name, blaster, icon, buttons:[{id,name,icon,code}] }]
+// Бластер — это zigbee-устройство, у которого в exposes есть ir_code_to_send/learn_ir_code.
+
+function deviceExposeProps(device) {
+  const props = new Set();
+  const walk = (arr) => {
+    for (const e of arr || []) {
+      if (!e || typeof e !== "object") continue;
+      const p = e.property || e.name;
+      if (p) props.add(p);
+      if (Array.isArray(e.features)) walk(e.features);
+      if (Array.isArray(e.exposes)) walk(e.exposes);
+    }
+  };
+  walk(device?.definition?.exposes || []);
+  return props;
+}
+
+// Список доступных ИК-бластеров (устройства, умеющие слать ИК-коды).
+function listIrBlasters() {
+  const z = ensureZigbeeState();
+  return Object.values(z.devices || {})
+    .filter((d) => d && d.type !== "Coordinator" && deviceExposeProps(d).has("ir_code_to_send"))
+    .map((d) => ({
+      friendlyName: d.friendlyName,
+      name: d.friendlyName,
+      vendor: d.definition?.vendor || null,
+      model: d.definition?.model || null,
+      canLearn: deviceExposeProps(d).has("learn_ir_code"),
+      status: zigbeeDeviceRuntimeStatus(d),
+      learnedCode: (z.values?.[d.friendlyName] || {}).learned_ir_code || null
+    }));
+}
+
+function findIrRemote(id) {
+  if (!Array.isArray(state.irRemotes)) state.irRemotes = [];
+  return state.irRemotes.find((r) => r && r.id === id) || null;
+}
+
+function irRemotePublicView(remote) {
+  const z = ensureZigbeeState();
+  const dev = z.devices?.[remote.blaster];
+  return {
+    ...remote,
+    buttons: Array.isArray(remote.buttons) ? remote.buttons : [],
+    blasterOnline: dev ? zigbeeDeviceRuntimeStatus(dev) === "online" : false,
+    blasterKnown: !!dev
+  };
+}
+
+// Список ИК-пультов + доступные бластеры.
+app.get("/api/ir/remotes", (req, res) => {
+  if (!Array.isArray(state.irRemotes)) state.irRemotes = [];
+  res.json({
+    ok: true,
+    remotes: state.irRemotes.map(irRemotePublicView),
+    blasters: listIrBlasters()
+  });
+});
+
+// Создать пульт.
+app.post("/api/ir/remotes", (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  const blaster = String(req.body?.blaster || "").trim();
+  if (!name) return res.status(400).json({ error: "name is required" });
+  if (!blaster) return res.status(400).json({ error: "blaster is required" });
+  if (!Array.isArray(state.irRemotes)) state.irRemotes = [];
+  const remote = {
+    id: nextId("ir"),
+    name,
+    blaster,
+    icon: String(req.body?.icon || "").trim() || "remote",
+    buttons: [],
+    createdAt: nowIso()
+  };
+  state.irRemotes.push(remote);
+  saveState();
+  res.json({ ok: true, remote: irRemotePublicView(remote) });
+});
+
+// Обновить пульт (имя/бластер/иконка).
+app.put("/api/ir/remotes/:id", (req, res) => {
+  const remote = findIrRemote(req.params.id);
+  if (!remote) return res.status(404).json({ error: "remote not found" });
+  if (req.body?.name != null) remote.name = String(req.body.name).trim() || remote.name;
+  if (req.body?.blaster != null) remote.blaster = String(req.body.blaster).trim() || remote.blaster;
+  if (req.body?.icon != null) remote.icon = String(req.body.icon).trim() || remote.icon;
+  saveState();
+  res.json({ ok: true, remote: irRemotePublicView(remote) });
+});
+
+// Удалить пульт.
+app.delete("/api/ir/remotes/:id", (req, res) => {
+  if (!Array.isArray(state.irRemotes)) state.irRemotes = [];
+  const before = state.irRemotes.length;
+  state.irRemotes = state.irRemotes.filter((r) => r && r.id !== req.params.id);
+  if (state.irRemotes.length === before) return res.status(404).json({ error: "remote not found" });
+  saveState();
+  res.json({ ok: true });
+});
+
+// Добавить кнопку с готовым ИК-кодом.
+app.post("/api/ir/remotes/:id/buttons", (req, res) => {
+  const remote = findIrRemote(req.params.id);
+  if (!remote) return res.status(404).json({ error: "remote not found" });
+  const name = String(req.body?.name || "").trim();
+  const code = String(req.body?.code || "").trim();
+  if (!name) return res.status(400).json({ error: "name is required" });
+  if (!code) return res.status(400).json({ error: "code is required" });
+  if (!Array.isArray(remote.buttons)) remote.buttons = [];
+  const button = {
+    id: nextId("irbtn"),
+    name,
+    code,
+    icon: String(req.body?.icon || "").trim() || "",
+    createdAt: nowIso()
+  };
+  remote.buttons.push(button);
+  saveState();
+  res.json({ ok: true, button, remote: irRemotePublicView(remote) });
+});
+
+// Обновить кнопку.
+app.put("/api/ir/remotes/:id/buttons/:btnId", (req, res) => {
+  const remote = findIrRemote(req.params.id);
+  if (!remote) return res.status(404).json({ error: "remote not found" });
+  const button = (remote.buttons || []).find((b) => b && b.id === req.params.btnId);
+  if (!button) return res.status(404).json({ error: "button not found" });
+  if (req.body?.name != null) button.name = String(req.body.name).trim() || button.name;
+  if (req.body?.code != null) button.code = String(req.body.code).trim() || button.code;
+  if (req.body?.icon != null) button.icon = String(req.body.icon).trim();
+  saveState();
+  res.json({ ok: true, button, remote: irRemotePublicView(remote) });
+});
+
+// Удалить кнопку.
+app.delete("/api/ir/remotes/:id/buttons/:btnId", (req, res) => {
+  const remote = findIrRemote(req.params.id);
+  if (!remote) return res.status(404).json({ error: "remote not found" });
+  const before = (remote.buttons || []).length;
+  remote.buttons = (remote.buttons || []).filter((b) => b && b.id !== req.params.btnId);
+  if (remote.buttons.length === before) return res.status(404).json({ error: "button not found" });
+  saveState();
+  res.json({ ok: true, remote: irRemotePublicView(remote) });
+});
+
+// Нажать кнопку — отправить ИК-код через бластер.
+app.post("/api/ir/remotes/:id/buttons/:btnId/send", async (req, res) => {
+  const remote = findIrRemote(req.params.id);
+  if (!remote) return res.status(404).json({ error: "remote not found" });
+  const button = (remote.buttons || []).find((b) => b && b.id === req.params.btnId);
+  if (!button) return res.status(404).json({ error: "button not found" });
+  try {
+    await zigbeePublish(`${remote.blaster}/set`, { ir_code_to_send: button.code });
+    logEvent({
+      type: "zigbee",
+      title: `ИК: ${remote.name} → ${button.name}`,
+      text: `Код отправлен через ${remote.blaster}`,
+      priority: "info",
+      source: `ir:${remote.id}`,
+      payload: { remote: remote.id, button: button.id }
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: e.message || String(e) });
+  }
+});
+
+// Отправить произвольный код напрямую (для теста перед сохранением кнопки).
+app.post("/api/ir/send", async (req, res) => {
+  const blaster = String(req.body?.blaster || "").trim();
+  const code = String(req.body?.code || "").trim();
+  if (!blaster) return res.status(400).json({ error: "blaster is required" });
+  if (!code) return res.status(400).json({ error: "code is required" });
+  try {
+    await zigbeePublish(`${blaster}/set`, { ir_code_to_send: code });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: e.message || String(e) });
+  }
+});
+
+// Запустить обучение: переводим бластер в режим захвата кода с пульта.
+app.post("/api/ir/learn/start", async (req, res) => {
+  const blaster = String(req.body?.blaster || "").trim();
+  if (!blaster) return res.status(400).json({ error: "blaster is required" });
+  const z = ensureZigbeeState();
+  // Запоминаем последний известный код ДО обучения, чтобы отличить новый.
+  const prev = (z.values?.[blaster] || {}).learned_ir_code || null;
+  state._irLearn = state._irLearn || {};
+  state._irLearn[blaster] = { startedAt: nowIso(), prevCode: prev };
+  try {
+    await zigbeePublish(`${blaster}/set`, { learn_ir_code: "ON" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: e.message || String(e) });
+  }
+});
+
+// Опрос результата обучения: новый learned_ir_code, появившийся после старта.
+app.get("/api/ir/learn/result", (req, res) => {
+  const blaster = String(req.query?.blaster || "").trim();
+  if (!blaster) return res.status(400).json({ error: "blaster is required" });
+  const z = ensureZigbeeState();
+  const current = (z.values?.[blaster] || {}).learned_ir_code || null;
+  const session = (state._irLearn || {})[blaster] || null;
+  const ready = !!(current && session && current !== session.prevCode);
+  res.json({
+    ok: true,
+    learning: !!session,
+    ready,
+    code: ready ? current : null
+  });
 });
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));

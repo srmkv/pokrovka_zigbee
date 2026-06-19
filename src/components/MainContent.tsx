@@ -28,6 +28,8 @@ import SystemPanel from "./System/SystemPanel";
 import TelegramSettingsPanel from "./Settings/TelegramSettingsPanel";
 import VpnSettingsPanel from "./Settings/VpnSettingsPanel";
 import ZigbeePanel from "./Zigbee/ZigbeePanel";
+import IrRemotesPanel from "./IR/IrRemotesPanel";
+import IrControls from "./IR/IrControls";
 
 interface MainContentProps {
   theme: "dark" | "light";
@@ -36,7 +38,7 @@ interface MainContentProps {
 
 const MainContent: React.FC<MainContentProps> = ({ theme, setTheme }) => {
   const [tab, setTab] = useState<"weather" | "control" | "automation" | "sensors" | "system" | "settings" | "traffic">("weather");
-  const [sensorsSection, setSensorsSection] = useState<"zigbee" | "arduino">("zigbee");
+  const [sensorsSection, setSensorsSection] = useState<"zigbee" | "ir" | "arduino">("zigbee");
   const [sensorTab, setSensorTab] = useState<"list" | "add">("list");
 
   return (
@@ -168,6 +170,8 @@ const MainContent: React.FC<MainContentProps> = ({ theme, setTheme }) => {
               </div>
             </div>
 
+            <IrControls />
+
             <div className="rounded-2xl border border-[#2a2b46] bg-[#131522] p-4">
               <div className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Жалюзи</div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -215,6 +219,17 @@ const MainContent: React.FC<MainContentProps> = ({ theme, setTheme }) => {
               </button>
               <button
                 type="button"
+                onClick={() => setSensorsSection("ir")}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  sensorsSection === "ir"
+                    ? "bg-blue-600 text-white shadow"
+                    : "text-gray-350 hover:bg-[#1b1d31] hover:text-gray-100"
+                }`}
+              >
+                ИК устройства
+              </button>
+              <button
+                type="button"
                 onClick={() => setSensorsSection("arduino")}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                   sensorsSection === "arduino"
@@ -230,6 +245,10 @@ const MainContent: React.FC<MainContentProps> = ({ theme, setTheme }) => {
           <div className="flex-1 min-h-0 overflow-hidden">
             {sensorsSection === "zigbee" ? (
               <ZigbeePanel />
+            ) : sensorsSection === "ir" ? (
+              <div className="h-full min-h-0 overflow-auto pr-1">
+                <IrRemotesPanel />
+              </div>
             ) : (
               <div className="h-full min-h-0 overflow-hidden flex flex-col gap-4">
                 <div className="shrink-0 flex items-center justify-between gap-3 rounded-2xl border border-[#2a2b46] bg-[#131522] p-3">

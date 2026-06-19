@@ -6,6 +6,7 @@ import WeatherFactIndicators from "./Weather/WeatherFactIndicators";
 
 // Open-Meteo
 import { useOpenMeteo } from "../hooks/useOpenMeteo";
+import { useNow } from "../hooks/useNow";
 import { conditionRuByWmo } from "./Weather/conditionMap"; // проверь путь!
 
 // координаты локации (Нижний Новгород)
@@ -21,11 +22,16 @@ const SideBar = () => {
   const temp = loading ? "--" : (now?.tempC ?? "--");
   const conditionRus = conditionRuByWmo(now?.wcode ?? null);
 
-  const date = new Date();
-  const dateString = date.toLocaleDateString("ru-RU", {
+  const clock = useNow();
+  const dateString = clock.toLocaleDateString("ru-RU", {
     weekday: "short",
     day: "numeric",
     month: "short",
+  });
+  const timeString = clock.toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   });
 
   return (
@@ -70,6 +76,7 @@ const SideBar = () => {
 
             <div className="flex flex-col items-center text-center text-gray-350 text-lg space-y-2">
               <p>Сегодня &bull; {dateString}</p>
+              <p className="font-mono text-2xl font-semibold text-gray-150 leading-none tabular-nums lining-nums tracking-wide">{timeString}</p>
               <span className="addr">
                 <i className="fas fa-map-marker-alt"></i>{" "}
                 Б.Покровская д. 80, 1й подъезд, 7й этаж
