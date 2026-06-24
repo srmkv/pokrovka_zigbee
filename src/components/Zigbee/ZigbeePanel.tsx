@@ -624,7 +624,7 @@ function ZigbeeControlRenderer({
             onChange={(event) => setTextValue(event.target.value)}
             className="w-20 rounded-lg border border-[#2a2b46] bg-[#111322] px-2 py-1 text-xs text-gray-200 outline-none focus:border-blue-500"
           />
-          <button disabled={busy} onClick={() => onSend(payloadFor(control, Number(textValue)))} className="rounded-lg border border-blue-500/60 px-3 py-1.5 text-xs text-blue-200 hover:bg-blue-500/10 disabled:opacity-60">OK</button>
+          <button disabled={busy} onClick={() => onSend(payloadFor(control, Number(textValue)))} className="rounded-lg border border-blue-500/60 px-3 py-2 text-xs text-blue-200 hover:bg-blue-500/10 disabled:opacity-60">OK</button>
         </div>
         {description}
       </div>
@@ -892,8 +892,11 @@ function preferredStateValues(control: ZigbeeControl | undefined, state: Record<
   return { on: control?.valueOn ?? "ON", off: control?.valueOff ?? "OFF", toggle: control?.valueToggle ?? "TOGGLE" };
 }
 
-// Цвет текста статуса (семафор), под mushroom-строку статуса
-function statusTextColor(profile: DeviceProfile, state: Record<string, unknown>) {
+// Цвет текста статуса (семафор), под mushroom-строку статуса.
+// Для offline/устаревших датчиков — нейтральный серый, чтобы не выдавать
+// устаревший пакет за «живую» тревогу (красный/жёлтый).
+function statusTextColor(profile: DeviceProfile, state: Record<string, unknown>, online = true) {
+  if (!online || state._stale === true) return "text-gray-400";
   const cur = valueLower(state.state);
   if (profile.kind === "valve") return ["on", "open", "opened", "true"].includes(cur) ? "text-emerald-300" : "text-gray-400";
   if (profile.kind === "relay" || profile.kind === "light") return ["on", "true", "1"].includes(cur) ? "text-emerald-300" : "text-gray-400";
@@ -1034,10 +1037,14 @@ function ImportantStateGrid({ device, profile }: { device: ZigbeeDevice; profile
   });
 
   const visible = (important.length ? important : entries).slice(0, 8);
+  const stale = state._stale === true || device.effectiveStatus === "offline";
 
   return (
     <div className="mt-3 rounded-xl border border-[#2a2b46] bg-[#181825] p-3">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Состояние</div>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Состояние</span>
+        {stale && <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-300/90">данные устарели · нет связи</span>}
+      </div>
       {visible.length === 0 ? (
         <div className="text-sm text-gray-500">Пока нет данных от устройства</div>
       ) : (
@@ -1113,7 +1120,7 @@ function ZigbeeDeviceCard({ device, advanced, onCommand, onSetNotify }: { device
 
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-base font-bold text-gray-100">{customName(device) || profile.title}</h3>
-          <div className={`truncate text-sm font-medium ${statusTextColor(profile, state)}`}>{statusText}</div>
+          <div className={`truncate text-sm font-medium ${statusTextColor(profile, state, online)}`}>{statusText}</div>
           {customName(device) && <div className="truncate text-[11px] text-gray-500">{profile.title}</div>}
           {bat && <div className="mt-1.5 flex flex-wrap gap-1.5">{bat}</div>}
         </div>
@@ -1305,6 +1312,26 @@ function deviceShortLabel(device?: ZigbeeDevice): string {
   return `${profile.title} ${String(device.friendlyName || "").slice(-4)}`;
 }
 
+// Группировка связок по исходному устройству («по каждому датчику»).
+function groupLinksBySource(links: DeviceLink[]): { friendlyName: string; links: DeviceLink[] }[] {
+  const map = new Map<string, DeviceLink[]>();
+  for (const l of links) {
+    const fn = l.source.friendlyName;
+    if (!map.has(fn)) map.set(fn, []);
+    map.get(fn)!.push(l);
+  }
+  return Array.from(map.entries()).map(([friendlyName, items]) => ({ friendlyName, links: items }));
+}
+
+function pluralLinks(n: number): string {
+  const a = Math.abs(n) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return "связок";
+  if (b > 1 && b < 5) return "связки";
+  if (b === 1) return "связка";
+  return "связок";
+}
+
 function DeviceLinksSection({ devices }: { devices: ZigbeeDevice[] }) {
   const { showAlert } = useUiPopup();
   const [links, setLinks] = useState<DeviceLink[]>([]);
@@ -1440,26 +1467,38 @@ function DeviceLinksSection({ devices }: { devices: ZigbeeDevice[] }) {
         <button disabled={busy || !sourceFn || !targetFn} onClick={addLink} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60">Добавить</button>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-3">
         {links.length === 0 ? (
           <div className="rounded-xl border border-[#2a2b46] bg-[#181825] p-3 text-sm text-gray-500">Связок пока нет. Создайте первую выше.</div>
         ) : (
-          links.map((link) => {
-            const src = byName(link.source.friendlyName);
-            const tgt = byName(link.target.friendlyName);
+          groupLinksBySource(links).map((group) => {
+            const src = byName(group.friendlyName);
             return (
-              <div key={link.id} className={`flex flex-wrap items-center gap-3 rounded-xl border border-[#2a2b46] bg-[#181825] p-3 ${link.enabled ? "" : "opacity-60"}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-gray-100">{link.name}</div>
-                  <div className="truncate text-xs text-gray-400">
-                    {src ? deviceShortLabel(src) : link.source.friendlyName} · {formatEventToken(link.source.action)}
-                    {" → "}
-                    {tgt ? deviceShortLabel(tgt) : link.target.friendlyName} · {commandShortLabel(link.target.command)}
+              <div key={group.friendlyName} className="rounded-xl border border-[#2a2b46] bg-[#181825] p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0 truncate text-sm font-semibold text-gray-100">
+                    {src ? deviceShortLabel(src) : group.friendlyName}
                   </div>
+                  <span className="shrink-0 rounded-full border border-[#2a2b46] px-2 py-0.5 text-[11px] text-gray-400">{group.links.length} {pluralLinks(group.links.length)}</span>
                 </div>
-                <button onClick={() => testLink(link.id)} disabled={busy} className="rounded-lg border border-[#2a2b46] px-3 py-1.5 text-xs text-gray-200 hover:bg-[#1b1d31] disabled:opacity-60">Тест</button>
-                <button onClick={() => toggleLink(link.id, !link.enabled)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${link.enabled ? "bg-emerald-600/20 text-emerald-200" : "border border-[#2a2b46] text-gray-300 hover:bg-[#1b1d31]"}`}>{link.enabled ? "Вкл" : "Выкл"}</button>
-                <button onClick={() => removeLink(link.id)} className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-200 hover:bg-red-500/10">Удалить</button>
+                <div className="space-y-2">
+                  {group.links.map((link) => {
+                    const tgt = byName(link.target.friendlyName);
+                    return (
+                      <div key={link.id} className={`flex flex-wrap items-center gap-2 rounded-lg border border-[#2a2b46] bg-[#131522] p-2.5 ${link.enabled ? "" : "opacity-60"}`}>
+                        <div className="min-w-0 flex-1 text-xs">
+                          <span className="text-amber-200">{formatEventToken(link.source.action)}</span>
+                          <span className="text-gray-500">{" → "}</span>
+                          <span className="font-medium text-gray-100">{tgt ? deviceShortLabel(tgt) : link.target.friendlyName}</span>
+                          <span className="text-gray-400"> · {commandShortLabel(link.target.command)}</span>
+                        </div>
+                        <button onClick={() => testLink(link.id)} disabled={busy} className="rounded-lg border border-[#2a2b46] px-3 py-1.5 text-xs text-gray-200 hover:bg-[#1b1d31] disabled:opacity-60">Тест</button>
+                        <button onClick={() => toggleLink(link.id, !link.enabled)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${link.enabled ? "bg-emerald-600/20 text-emerald-200" : "border border-[#2a2b46] text-gray-300 hover:bg-[#1b1d31]"}`}>{link.enabled ? "Вкл" : "Выкл"}</button>
+                        <button onClick={() => removeLink(link.id)} className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-200 hover:bg-red-500/10">Удалить</button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })
@@ -1468,6 +1507,32 @@ function DeviceLinksSection({ devices }: { devices: ZigbeeDevice[] }) {
     </div>
   );
 }
+
+// Самостоятельная панель связок для вкладки «Автоматизация»:
+// сама подтягивает список устройств из /api/zigbee/status (без зависимости от ZigbeePanel).
+export const DeviceLinksPanel: React.FC = () => {
+  const [devices, setDevices] = useState<ZigbeeDevice[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const r = await fetch(`${API_BASE}/zigbee/status`, { cache: "no-store" });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (alive) setDevices(Array.isArray(d.devices) ? d.devices : []);
+      } catch {
+        /* ignore */
+      }
+    };
+    load();
+    const t = window.setInterval(load, 7000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, []);
+  return <DeviceLinksSection devices={devices} />;
+};
 
 const ZigbeePanel: React.FC = () => {
   const { showAlert } = useUiPopup();
@@ -1609,8 +1674,6 @@ const ZigbeePanel: React.FC = () => {
           <a href={frontendHref} target="_blank" rel="noreferrer" className="rounded-lg border border-blue-500/50 px-4 py-2 text-sm text-blue-200 hover:bg-blue-500/10">Открыть Zigbee2MQTT</a>
         </div>
       </div>
-
-      <DeviceLinksSection devices={status.devices} />
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#2a2b46] bg-[#131522] p-3">
         <div className="min-w-0">

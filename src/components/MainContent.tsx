@@ -27,111 +27,72 @@ import NotificationBell from "./NotificationBell";
 import SystemPanel from "./System/SystemPanel";
 import TelegramSettingsPanel from "./Settings/TelegramSettingsPanel";
 import VpnSettingsPanel from "./Settings/VpnSettingsPanel";
-import ZigbeePanel from "./Zigbee/ZigbeePanel";
+import ZigbeePanel, { DeviceLinksPanel } from "./Zigbee/ZigbeePanel";
 import IrRemotesPanel from "./IR/IrRemotesPanel";
 import IrControls from "./IR/IrControls";
+
+type TabId = "weather" | "control" | "automation" | "sensors" | "system" | "settings" | "traffic";
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "weather", label: "Погода" },
+  { id: "control", label: "Управление" },
+  { id: "automation", label: "Автоматизация" },
+  { id: "sensors", label: "Датчики" },
+  { id: "system", label: "Система" },
+  { id: "settings", label: "Настройки" },
+  { id: "traffic", label: "Пробки" },
+];
 
 interface MainContentProps {
   theme: "dark" | "light";
   setTheme: (theme: "dark" | "light") => void;
+  onOpenNav?: () => void;
 }
 
-const MainContent: React.FC<MainContentProps> = ({ theme, setTheme }) => {
-  const [tab, setTab] = useState<"weather" | "control" | "automation" | "sensors" | "system" | "settings" | "traffic">("weather");
+const MainContent: React.FC<MainContentProps> = ({ theme, setTheme, onOpenNav }) => {
+  const [tab, setTab] = useState<TabId>("weather");
   const [sensorsSection, setSensorsSection] = useState<"zigbee" | "ir" | "arduino">("zigbee");
   const [sensorTab, setSensorTab] = useState<"list" | "add">("list");
 
   return (
-    <div className="app-content text-gray-150 p-4 h-screen flex flex-col overflow-hidden">
-      {/* Табы по правому краю */}
-      <div className="flex items-center justify-between gap-4 mb-4 shrink-0">
-  <div className="flex items-center gap-3 min-w-0">
-    <LeakSensorsRow />
-    <HomeStatusChips />
-  </div>
-  <div className="flex items-center gap-2 justify-end min-w-0">
-  <div className="flex gap-2 flex-wrap justify-end">
-    <button
-      onClick={() => setTab("weather")}
-      className={`
-        px-4 py-1.5 rounded-lg font-medium text-sm transition-all duration-150 border-2
-        ${tab === "weather"
-          ? "bg-blue-700 border-blue-400 shadow-xl text-gray-100"
-          : "bg-[#1a1b2d] border-[#232445] text-gray-350 hover:bg-blue-900 hover:border-blue-500"}
-      `}
-    >
-      Погода
-    </button>
-    <button
-      onClick={() => setTab("control")}
-      className={`
-        px-4 py-1.5 rounded-lg font-medium text-sm transition-all duration-150 border-2
-        ${tab === "control"
-          ? "bg-blue-700 border-blue-400 shadow-xl text-gray-100"
-          : "bg-[#1a1b2d] border-[#232445] text-gray-350 hover:bg-blue-900 hover:border-blue-500"}
-      `}
-    >
-      Управление
-    </button>
-    <button
-      onClick={() => setTab("automation")}
-      className={`
-        px-4 py-1.5 rounded-lg font-medium text-sm transition-all duration-150 border-2
-        ${tab === "automation"
-          ? "bg-blue-700 border-blue-400 shadow-xl text-gray-100"
-          : "bg-[#1a1b2d] border-[#232445] text-gray-350 hover:bg-blue-900 hover:border-blue-500"}
-      `}
-    >
-      Автоматизация
-    </button>
-    <button
-      onClick={() => setTab("sensors")}
-      className={`
-        px-4 py-1.5 rounded-lg font-medium text-sm transition-all duration-150 border-2
-        ${tab === "sensors"
-          ? "bg-blue-700 border-blue-400 shadow-xl text-gray-100"
-          : "bg-[#1a1b2d] border-[#232445] text-gray-350 hover:bg-blue-900 hover:border-blue-500"}
-      `}
-    >
-      Датчики
-    </button>
-    <button
-      onClick={() => setTab("system")}
-      className={`
-        px-4 py-1.5 rounded-lg font-medium text-sm transition-all duration-150 border-2
-        ${tab === "system"
-          ? "bg-blue-700 border-blue-400 shadow-xl text-gray-100"
-          : "bg-[#1a1b2d] border-[#232445] text-gray-350 hover:bg-blue-900 hover:border-blue-500"}
-      `}
-    >
-      Система
-    </button>
-    <button
-      onClick={() => setTab("settings")}
-      className={`
-        px-4 py-1.5 rounded-lg font-medium text-sm transition-all duration-150 border-2
-        ${tab === "settings"
-          ? "bg-blue-700 border-blue-400 shadow-xl text-gray-100"
-          : "bg-[#1a1b2d] border-[#232445] text-gray-350 hover:bg-blue-900 hover:border-blue-500"}
-      `}
-    >
-      Настройки
-    </button>
-    <button
-      onClick={() => setTab("traffic")}
-      className={`
-        px-4 py-1.5 rounded-lg font-medium text-sm transition-all duration-150 border-2
-        ${tab === "traffic"
-          ? "bg-blue-700 border-blue-400 shadow-xl text-gray-100"
-          : "bg-[#1a1b2d] border-[#232445] text-gray-350 hover:bg-blue-900 hover:border-blue-500"}
-      `}
-    >
-      Пробки
-    </button>
-  </div>
-    <NotificationBell />
-  </div>
-</div>
+    <div className="app-content text-gray-150 p-3 sm:p-4 h-screen flex flex-col overflow-hidden">
+      {/* Верхняя панель: на мобиле — меню+индикаторы+уведомления, лента вкладок отдельной строкой;
+          на десктопе (lg) — одна строка, как раньше (индикаторы слева, вкладки+колокольчик справа). */}
+      <div className="mb-3 sm:mb-4 shrink-0 flex flex-wrap items-center gap-2 sm:gap-3 lg:flex-nowrap lg:gap-4">
+        <button
+          type="button"
+          onClick={onOpenNav}
+          aria-label="Погода и меню"
+          className="order-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-[#232445] bg-[#1a1b2d] text-gray-200 transition hover:border-blue-500 hover:text-white lg:hidden"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+        <div className="order-2 flex min-w-0 flex-1 items-center gap-2 overflow-x-auto no-scrollbar sm:gap-3">
+          <LeakSensorsRow />
+          <HomeStatusChips />
+        </div>
+        <div className="order-3 shrink-0 lg:order-4">
+          <NotificationBell />
+        </div>
+        <div className="order-4 -mx-1 flex w-full gap-2 overflow-x-auto px-1 pb-1 no-scrollbar lg:order-3 lg:mx-0 lg:w-auto lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0 lg:justify-end">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`shrink-0 whitespace-nowrap rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all duration-150
+                ${tab === t.id
+                  ? "bg-blue-700 border-blue-400 shadow-xl text-gray-100"
+                  : "bg-[#1a1b2d] border-[#232445] text-gray-350 hover:bg-blue-900 hover:border-blue-500"}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
       {tab === "weather" ? (
@@ -185,18 +146,14 @@ const MainContent: React.FC<MainContentProps> = ({ theme, setTheme }) => {
           </div>
         </div>
       ) : tab === "automation" ? (
-        <div className="h-full min-h-0 overflow-hidden grid grid-rows-[auto,minmax(0,1fr),minmax(0,1fr)] gap-3">
-          <div className="min-h-0 shrink-0">
-            <AutomationOverview />
+        <div className="h-full min-h-0 overflow-y-auto custom-scroll flex flex-col gap-3 pr-1">
+          <AutomationOverview />
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            <div className="h-[58vh]"><ScenarioPanel /></div>
+            <div className="h-[58vh]"><RulesPanel /></div>
           </div>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 min-h-0 overflow-hidden">
-            <div className="min-h-0 overflow-hidden"><ScenarioPanel /></div>
-            <div className="min-h-0 overflow-hidden"><RulesPanel /></div>
-          </div>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 min-h-0 overflow-hidden">
-            <div className="min-h-0 overflow-hidden"><DeviceHeartbeatPanel /></div>
-            <div className="min-h-0 overflow-hidden"><EventLogPanel /></div>
-          </div>
+          <DeviceLinksPanel />
+          <div className="h-[55vh]"><EventLogPanel /></div>
         </div>
       ) : tab === "sensors" ? (
         <div className="h-full min-h-0 overflow-hidden flex flex-col gap-4">
@@ -298,7 +255,10 @@ const MainContent: React.FC<MainContentProps> = ({ theme, setTheme }) => {
           </div>
         </div>
       ) : tab === "system" ? (
-        <SystemPanel />
+        <div className="h-full min-h-0 overflow-y-auto custom-scroll flex flex-col gap-3 pr-1">
+          <div className="h-[78vh] shrink-0"><SystemPanel /></div>
+          <div className="h-[62vh] shrink-0"><DeviceHeartbeatPanel /></div>
+        </div>
       ) : tab === "settings" ? (
         <div className="h-full min-h-0 overflow-auto py-4">
           <div className="mx-auto w-full max-w-5xl space-y-4">

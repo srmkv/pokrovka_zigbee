@@ -113,63 +113,48 @@ function defaultSensorRegistry() {
   }));
 }
 
-const SCENARIOS = [
-  {
-    id: "morning",
-    name: "Утро",
-    description: "Свет включён, жалюзи приоткрыты, пол в комфортном режиме",
-    apply: async () => {
-      state.light.effect = "on";
-      state.blinds.kitchen = 60;
-      state.blinds.holl = 40;
-      state.floor.living = { on: true, temp: 25 };
-      state.floor.bath = { on: true, temp: 26 };
-      await sendToArduino("on");
-    }
-  },
-  {
-    id: "night",
-    name: "Ночь",
-    description: "Свет выключен, жалюзи закрыты, тёплый пол в экономичном режиме",
-    apply: async () => {
-      state.light.effect = "off";
-      state.blinds.kitchen = 0;
-      state.blinds.holl = 0;
-      state.blinds.room = 0;
-      state.floor.living = { on: true, temp: 23 };
-      state.floor.bath = { on: true, temp: 24 };
-      await sendToArduino("off");
-    }
-  },
-  {
-    id: "away",
-    name: "Ушёл из дома",
-    description: "Свет выключен, жалюзи закрыты, пол понижен",
-    apply: async () => {
-      state.light.effect = "off";
-      state.blinds.kitchen = 0;
-      state.blinds.holl = 0;
-      state.blinds.room = 0;
-      state.floor.living = { on: false, temp: 20 };
-      state.floor.bath = { on: false, temp: 20 };
-      await sendToArduino("off");
-    }
-  },
-  {
-    id: "vacation",
-    name: "Отпуск",
-    description: "Экономичный режим для долгого отсутствия",
-    apply: async () => {
-      state.light.effect = "off";
-      state.blinds.kitchen = 0;
-      state.blinds.holl = 0;
-      state.blinds.room = 0;
-      state.floor.living = { on: false, temp: 18 };
-      state.floor.bath = { on: false, temp: 18 };
-      await sendToArduino("off");
-    }
-  }
+// Лампы для сценариев. ВНИМАНИЕ: прихожая/зал/кухня/ванная физически на ОДНОМ
+// RF-коде 11868689 (общий канал), гардероб — отдельный 11868692. relay?code= это
+// тоггл, поэтому в движке сценариев коды дедуплицируются (см. applyScenarioActions).
+const SCENARIO_LAMPS = [
+  { tag: "prihozhaya", code: 11868689, label: "Прихожая" },
+  { tag: "holl", code: 11868689, label: "Зал" },
+  { tag: "kitchen", code: 11868689, label: "Кухня" },
+  { tag: "bath", code: 11868689, label: "Ванная" },
+  { tag: "garderob", code: 11868692, label: "Гардероб" },
 ];
+
+// Сценарии — data-driven (хранятся в state.scenarios.items, редактируются из UI).
+// Каждое действие поддерживает "skip" — не трогать это устройство.
+function defaultScenarios() {
+  return [
+    { id: "morning", name: "Утро", icon: "🌅",
+      description: "Свет на кухне и в прихожей, жалюзи приоткрыты, пол комфортный, вода открыта",
+      actions: { lamps: { prihozhaya: "on", holl: "skip", kitchen: "on", bath: "skip", garderob: "skip" },
+        led: "on", blinds: { kitchen: 30, holl: 40, room: "skip" },
+        floor: { living: { on: true, temp: 25 }, bath: { on: true, temp: 26 } }, valves: "open", ir: [] } },
+    { id: "evening", name: "Вечер", icon: "🌆",
+      description: "Тёплый свет в зале и на кухне, жалюзи закрыты, пол комфортный",
+      actions: { lamps: { prihozhaya: "on", holl: "on", kitchen: "on", bath: "skip", garderob: "skip" },
+        led: "on", blinds: { kitchen: 100, holl: 100, room: 100 },
+        floor: { living: { on: true, temp: 24 }, bath: { on: true, temp: 25 } }, valves: "skip", ir: [] } },
+    { id: "night", name: "Ночь", icon: "🌙",
+      description: "Свет выключен, жалюзи закрыты, пол в экономичном режиме, ТВ выключен",
+      actions: { lamps: { prihozhaya: "off", holl: "off", kitchen: "off", bath: "off", garderob: "off" },
+        led: "off", blinds: { kitchen: 100, holl: 100, room: 100 },
+        floor: { living: { on: true, temp: 23 }, bath: { on: true, temp: 24 } }, valves: "skip", ir: [] } },
+    { id: "away", name: "Ушёл из дома", icon: "🚪",
+      description: "Всё выключено, жалюзи закрыты, пол понижен, вода перекрыта, ТВ выключен",
+      actions: { lamps: { prihozhaya: "off", holl: "off", kitchen: "off", bath: "off", garderob: "off" },
+        led: "off", blinds: { kitchen: 100, holl: 100, room: 100 },
+        floor: { living: { on: false, temp: 20 }, bath: { on: false, temp: 20 } }, valves: "close", ir: [] } },
+    { id: "vacation", name: "Отпуск", icon: "✈️",
+      description: "Экономичный режим для долгого отсутствия, вода перекрыта, антимороз",
+      actions: { lamps: { prihozhaya: "off", holl: "off", kitchen: "off", bath: "off", garderob: "off" },
+        led: "off", blinds: { kitchen: 100, holl: 100, room: 100 },
+        floor: { living: { on: false, temp: 18 }, bath: { on: false, temp: 18 } }, valves: "close", ir: [] } },
+  ];
+}
 
 function defaultRules() {
   return [
@@ -268,13 +253,15 @@ function defaultState() {
     devices: {},
     scenarios: {
       activeScenarioId: null,
-      lastAppliedAt: null
+      lastAppliedAt: null,
+      items: defaultScenarios()
     },
     rules: defaultRules(),
     deviceLinks: [],
     waterValves: {},
     zigbeeNotify: {},
     irRemotes: [],
+    aliceAuth: { accessToken: null, refreshToken: null },
     sensorRegistry: defaultSensorRegistry(),
     sensorStates: {},
     settings: {
@@ -310,6 +297,7 @@ function loadState() {
         bath: { ...defaultState().floor.bath, ...(state.floor?.bath || {}) }
       };
       state.scenarios = { ...defaultState().scenarios, ...(state.scenarios || {}) };
+      if (!Array.isArray(state.scenarios.items) || state.scenarios.items.length === 0) state.scenarios.items = defaultScenarios();
       state.devices = state.devices || {};
       state.eventLog = Array.isArray(state.eventLog) ? state.eventLog : [];
       state.notifications = Array.isArray(state.notifications) ? state.notifications : [];
@@ -318,6 +306,7 @@ function loadState() {
       state.waterValves = (state.waterValves && typeof state.waterValves === "object" && !Array.isArray(state.waterValves)) ? state.waterValves : {};
       state.zigbeeNotify = (state.zigbeeNotify && typeof state.zigbeeNotify === "object" && !Array.isArray(state.zigbeeNotify)) ? state.zigbeeNotify : {};
       state.irRemotes = Array.isArray(state.irRemotes) ? state.irRemotes : [];
+      state.aliceAuth = (state.aliceAuth && typeof state.aliceAuth === "object") ? state.aliceAuth : { accessToken: null, refreshToken: null };
       state.sensorRegistry = mergeSensorRegistry(state.sensorRegistry);
       state.sensorStates = state.sensorStates || {};
       state.settings = {
@@ -727,11 +716,20 @@ function getSensorComputedState(sensor) {
   const legacyStatus = sensor.legacyKey ? state[sensor.legacyKey] : undefined;
   const legacyLastTriggerAt = legacyLastKey ? state[legacyLastKey] : null;
 
+  const lastTriggerAt = saved.lastTriggerAt ?? legacyLastTriggerAt ?? null;
+  const lastSeenAt = saved.lastSeenAt || (sensor.legacyKey === "washingMachineSensor" ? state.washingMachineLastSeenAt || null : null);
+  // Честный статус: «unknown» (→ «Нет данных»), пока датчик реально не отчитался.
+  // Раньше дефолтное "dry" (и в sensorStates, и в legacy-ключах) протекало в UI как
+  // «Всё сухо» даже для датчиков, которые ни разу не присылали данные. Признак реального
+  // отчёта — только lastSeenAt/lastTriggerAt (applySensorState всегда ставит lastSeenAt),
+  // а НЕ saved.status (он засеян значением "dry").
+  const hasReport = !!(lastSeenAt || lastTriggerAt);
+
   return {
     sensorId: sensor.id,
-    status: saved.status || legacyStatus || "unknown",
-    lastTriggerAt: saved.lastTriggerAt ?? legacyLastTriggerAt ?? null,
-    lastSeenAt: saved.lastSeenAt || (sensor.legacyKey === "washingMachineSensor" ? state.washingMachineLastSeenAt || null : null),
+    status: hasReport ? (saved.status || legacyStatus || "unknown") : "unknown",
+    lastTriggerAt,
+    lastSeenAt,
     lastPayload: saved.lastPayload || (sensor.legacyKey === "washingMachineSensor" ? state.washingMachineLastPayload || null : null),
     resetVersion: Number.isFinite(saved.resetVersion) ? saved.resetVersion : (sensor.legacyKey === "washingMachineSensor" ? state.washingMachineResetVersion || 0 : 0),
     lastResetAt: saved.lastResetAt || (sensor.legacyKey === "washingMachineSensor" ? state.washingMachineLastResetAt || null : null),
@@ -943,11 +941,127 @@ function runRules({ previous }) {
   }
 }
 
+function ensureScenarioState() {
+  if (!state.scenarios || typeof state.scenarios !== "object") {
+    state.scenarios = { activeScenarioId: null, lastAppliedAt: null, items: defaultScenarios() };
+  }
+  if (!Array.isArray(state.scenarios.items) || state.scenarios.items.length === 0) {
+    state.scenarios.items = defaultScenarios();
+  }
+  return state.scenarios;
+}
+
+// Приводит набор устройств к состоянию из сценария. "skip"/отсутствие = не трогать.
+async function applyScenarioActions(actions) {
+  actions = (actions && typeof actions === "object") ? actions : {};
+
+  // Лампы: дедуп по RF-коду (общий канал), тоггл только если состояние отличается.
+  const lampWants = (actions.lamps && typeof actions.lamps === "object") ? actions.lamps : {};
+  const byCode = new Map();
+  for (const l of SCENARIO_LAMPS) {
+    const w = lampWants[l.tag];
+    if (w !== "on" && w !== "off") continue;
+    const cur = byCode.get(l.code) || { want: false, set: false };
+    cur.want = cur.set ? (cur.want || w === "on") : (w === "on"); // конфликт в общем канале → "on" побеждает
+    cur.set = true;
+    byCode.set(l.code, cur);
+  }
+  for (const [code, info] of byCode) {
+    const anyTag = (SCENARIO_LAMPS.find(l => l.code === code) || {}).tag;
+    const current = !!(state.relays && state.relays[anyTag]);
+    if (current !== info.want) {
+      await sendToArduino(`relay?code=${code}`);
+      await new Promise(r => setTimeout(r, 400));
+    }
+    state.relays = state.relays || {};
+    for (const l of SCENARIO_LAMPS) if (l.code === code) state.relays[l.tag] = info.want;
+  }
+
+  // Подсветка (LED): команда on/off на Arduino.
+  if (actions.led === "on" || actions.led === "off") {
+    await sendToArduino(actions.led);
+    state.light = state.light || {};
+    state.light.effect = actions.led;
+  }
+
+  // Жалюзи (state-driven, как в UI).
+  const bl = (actions.blinds && typeof actions.blinds === "object") ? actions.blinds : {};
+  state.blinds = state.blinds || {};
+  for (const zone of ["kitchen", "holl", "room"]) {
+    if (typeof bl[zone] === "number") state.blinds[zone] = Math.max(0, Math.min(100, Math.round(bl[zone])));
+  }
+
+  // Тёплый пол.
+  const fl = (actions.floor && typeof actions.floor === "object") ? actions.floor : {};
+  state.floor = state.floor || {};
+  for (const key of ["living", "bath"]) {
+    const v = fl[key];
+    if (v && typeof v === "object" && typeof v.on === "boolean") {
+      const temp = Math.max(15, Math.min(35, Math.round(Number(v.temp) || 20)));
+      state.floor[key] = { on: v.on, temp };
+    }
+  }
+
+  // Краны водоснабжения (все настроенные).
+  if (actions.valves === "open" || actions.valves === "close") {
+    const valves = (state.waterValves && typeof state.waterValves === "object") ? state.waterValves : {};
+    for (const cfg of Object.values(valves)) {
+      if (!cfg || !cfg.friendlyName) continue;
+      try {
+        const v = resolveTargetStateValues(cfg.friendlyName);
+        await zigbeePublish(`${cfg.friendlyName}/set`, { state: actions.valves === "open" ? v.on : v.off });
+      } catch (e) { /* кран недоступен — пропускаем */ }
+    }
+  }
+
+  // ИК-кнопки (например, выключить ТВ).
+  for (const ref of (Array.isArray(actions.ir) ? actions.ir : [])) {
+    const remote = (state.irRemotes || []).find(r => r && r.id === (ref && ref.remoteId));
+    const btn = remote && (remote.buttons || []).find(b => b && b.id === (ref && ref.buttonId));
+    if (remote && btn && remote.blaster) {
+      try { await zigbeePublish(`${remote.blaster}/set`, { ir_code_to_send: btn.code }); } catch (e) { /* ignore */ }
+    }
+  }
+}
+
+// Валидация/нормализация actions из редактора.
+function sanitizeScenarioActions(input) {
+  const a = (input && typeof input === "object") ? input : {};
+  const lampVal = (v) => (v === "on" || v === "off") ? v : "skip";
+  const lamps = {};
+  for (const l of SCENARIO_LAMPS) lamps[l.tag] = lampVal((a.lamps || {})[l.tag]);
+  const blinds = {};
+  for (const zone of ["kitchen", "holl", "room"]) {
+    const v = (a.blinds || {})[zone];
+    blinds[zone] = (typeof v === "number") ? Math.max(0, Math.min(100, Math.round(v))) : "skip";
+  }
+  const floor = {};
+  for (const key of ["living", "bath"]) {
+    const v = (a.floor || {})[key];
+    if (v && typeof v === "object" && typeof v.on === "boolean") {
+      floor[key] = { on: v.on, temp: Math.max(15, Math.min(35, Math.round(Number(v.temp) || 20))) };
+    } else floor[key] = "skip";
+  }
+  const ir = Array.isArray(a.ir)
+    ? a.ir.filter(x => x && typeof x.remoteId === "string" && typeof x.buttonId === "string")
+        .map(x => ({ remoteId: x.remoteId, buttonId: x.buttonId }))
+    : [];
+  return {
+    lamps,
+    led: (a.led === "on" || a.led === "off") ? a.led : "skip",
+    blinds,
+    floor,
+    valves: (a.valves === "open" || a.valves === "close") ? a.valves : "skip",
+    ir,
+  };
+}
+
 async function applyScenario(scenarioId, source = "ui") {
-  const scenario = SCENARIOS.find(item => item.id === scenarioId);
+  ensureScenarioState();
+  const scenario = state.scenarios.items.find(item => item.id === scenarioId);
   if (!scenario) return null;
 
-  await scenario.apply();
+  await applyScenarioActions(scenario.actions);
   state.scenarios.activeScenarioId = scenario.id;
   state.scenarios.lastAppliedAt = nowIso();
 
@@ -975,6 +1089,42 @@ async function applyScenario(scenarioId, source = "ui") {
 
 // ===== Zigbee / Zigbee2MQTT integration =====
 const ZIGBEE_DEVICE_TIMEOUT_MS = Number(process.env.ZIGBEE_DEVICE_TIMEOUT_MS || 2 * 60 * 60 * 1000);
+// Сколько держим «движение/присутствие» = true без свежих сообщений датчика.
+// Tuya-PIR иногда теряет «clear»-пакет и occupancy залипает в true. После этого окна
+// считаем движение завершённым (keep_time таких датчиков обычно 10–120с).
+const MOTION_HOLD_MS = Number(process.env.MOTION_HOLD_MS || 120 * 1000);
+
+// Готовит значения датчика для отдачи в UI. Не мутирует хранилище (работает на копии).
+// 1) Гасит МОМЕНТАЛЬНОЕ движение/присутствие, залипшее из-за потерянного clear-пакета.
+// 2) ЛАТЧИНГОВЫЕ тревоги (дым/протечка/газ/tamper/контакт) по таймеру НЕ трогает —
+//    при offline лишь помечает данные устаревшими (_stale), чтобы UI не выдавал
+//    5-дневный пакет за «живую» тревогу.
+// 3) Убирает накопленные «мусорные» ключи, которых нет в exposes устройства
+//    (например, залипший contact у кнопки — устройство такой ключ никогда не шлёт).
+function effectiveZigbeeValues(values, effectiveStatus, exposesProps) {
+  if (!values || typeof values !== "object") return values || {};
+  const out = { ...values };
+
+  if (out.occupancy === true || out.presence === true) {
+    const ref = out._motionAt || out._updatedAt;
+    const t = ref ? new Date(ref).getTime() : 0;
+    if (!t || (Date.now() - t) > MOTION_HOLD_MS) {
+      out._motionStale = true;
+      if (out.occupancy === true) out.occupancy = false;
+      if (out.presence === true) out.presence = false;
+    }
+  }
+
+  if (effectiveStatus === "offline") out._stale = true;
+
+  if (exposesProps && exposesProps.size) {
+    for (const k of Object.keys(out)) {
+      if (k.startsWith("_")) continue;
+      if (!exposesProps.has(k)) delete out[k];
+    }
+  }
+  return out;
+}
 let zigbeeClient = null;
 let zigbeeSaveTimer = null;
 
@@ -1728,6 +1878,12 @@ function handleZigbeeMqttMessage(topic, payloadBuffer) {
         merged._lastAction = String(actionValue);
         merged._lastActionAt = nowIso();
       }
+      // Метка времени движения — для устойчивости к потерянным «clear»-пакетам PIR.
+      if (payload.occupancy === true || payload.presence === true) {
+        merged._motionAt = nowIso();
+      } else if (payload.occupancy === false || payload.presence === false) {
+        merged._motionAt = null;
+      }
       z.values[friendlyName] = merged;
       touchDevice(`zigbee:${friendlyName}`, { name: friendlyName, source: "zigbee", timeoutMs: ZIGBEE_DEVICE_TIMEOUT_MS, meta: payload });
       recordZigbeeEventForHomeLog(friendlyName, payload);
@@ -1837,22 +1993,33 @@ function zigbeePublish(relativeTopic, payload) {
 }
 
 function zigbeeDeviceRuntimeStatus(device) {
-  const last = device?.lastMessageAt || device?.availabilityUpdatedAt || device?.updatedAt;
-  if (!last) return device?.availability || "unknown";
+  // Доступность из Zigbee2MQTT (availability включён в конфиге) — авторитетный сигнал.
+  // Раньше статус выводился из возраста последнего сообщения, из-за чего редко
+  // отчитывающиеся устройства (ИК-бластер, батарейные датчики) ложно показывались
+  // offline, хотя z2m считает их online. Теперь доверяем availability, а эвристику
+  // по возрасту последнего сообщения применяем только как фолбэк, когда availability
+  // неизвестна.
   if (device?.availability === "offline") return "offline";
+  if (device?.availability === "online") return "online";
+  const last = device?.lastMessageAt || device?.availabilityUpdatedAt || device?.updatedAt;
+  if (!last) return "unknown";
   return Date.now() - new Date(last).getTime() <= ZIGBEE_DEVICE_TIMEOUT_MS ? "online" : "unknown";
 }
 
 function zigbeeStatusResponse() {
   const z = ensureZigbeeState();
   const devices = Object.values(z.devices || {})
-    .map(device => ({
-      ...device,
-      state: z.values?.[device.friendlyName] || {},
-      controls: zigbeeDeviceControls(device, z.values?.[device.friendlyName] || {}),
-      effectiveStatus: zigbeeDeviceRuntimeStatus(device),
-      notify: !!(state.zigbeeNotify && state.zigbeeNotify[device.friendlyName])
-    }))
+    .map(device => {
+      const effectiveStatus = zigbeeDeviceRuntimeStatus(device);
+      const values = effectiveZigbeeValues(z.values?.[device.friendlyName] || {}, effectiveStatus, deviceExposeProps(device));
+      return {
+        ...device,
+        state: values,
+        controls: zigbeeDeviceControls(device, values),
+        effectiveStatus,
+        notify: !!(state.zigbeeNotify && state.zigbeeNotify[device.friendlyName])
+      };
+    })
     .sort((a, b) => String(a.friendlyName || "").localeCompare(String(b.friendlyName || ""), "ru"));
 
   return {
@@ -1878,6 +2045,7 @@ function zigbeeStatusResponse() {
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // для OAuth-форм Яндекс Алисы
 loadState();
 ensureSensorRegistryState();
 saveState();
@@ -1985,14 +2153,36 @@ app.post("/api/device/heartbeat", (req, res) => {
 });
 
 app.get("/api/scenarios", (req, res) => {
+  ensureScenarioState();
   res.json({
     activeScenarioId: state.scenarios.activeScenarioId || null,
-    items: SCENARIOS.map(item => ({
+    items: state.scenarios.items.map(item => ({
       id: item.id,
       name: item.name,
-      description: item.description,
+      icon: item.icon || "",
+      description: item.description || "",
+      actions: item.actions || {},
       active: state.scenarios.activeScenarioId === item.id
     }))
+  });
+});
+
+// Доступные «цели» для редактора сценариев (лампы/жалюзи/пол/краны/ИК-кнопки).
+app.get("/api/scenarios/targets", (req, res) => {
+  const valves = Object.entries((state.waterValves && typeof state.waterValves === "object") ? state.waterValves : {})
+    .filter(([, c]) => c && c.friendlyName)
+    .map(([slot, c]) => ({ slot, label: c.label || slot }));
+  const irButtons = [];
+  for (const r of (Array.isArray(state.irRemotes) ? state.irRemotes : [])) {
+    for (const b of (r.buttons || [])) irButtons.push({ remoteId: r.id, buttonId: b.id, label: `${r.name}: ${b.name}` });
+  }
+  res.json({
+    lamps: SCENARIO_LAMPS.map(l => ({ tag: l.tag, label: l.label, code: l.code })),
+    blinds: [{ zone: "kitchen", label: "Кухня" }, { zone: "holl", label: "Зал" }, { zone: "room", label: "Комната" }],
+    floor: [{ key: "living", label: "Гостиная" }, { key: "bath", label: "Ванная" }],
+    valvesConfigured: valves.length > 0,
+    valves,
+    irButtons,
   });
 });
 
@@ -2001,6 +2191,20 @@ app.post("/api/scenarios/apply", async (req, res) => {
   const scenario = await applyScenario(scenarioId, "ui");
   if (!scenario) return res.status(400).json({ error: "Unknown scenario" });
   res.json({ ok: true, activeScenarioId: state.scenarios.activeScenarioId, scenarioId: scenario.id });
+});
+
+// Редактирование сценария (имя/иконка/описание/действия).
+app.put("/api/scenarios/:id", (req, res) => {
+  ensureScenarioState();
+  const item = state.scenarios.items.find(s => s.id === req.params.id);
+  if (!item) return res.status(404).json({ error: "Unknown scenario" });
+  const { name, icon, description, actions } = req.body || {};
+  if (typeof name === "string" && name.trim()) item.name = name.trim().slice(0, 40);
+  if (typeof icon === "string") item.icon = icon.slice(0, 8);
+  if (typeof description === "string") item.description = description.slice(0, 200);
+  if (actions && typeof actions === "object") item.actions = sanitizeScenarioActions(actions);
+  saveState();
+  res.json({ ok: true, item });
 });
 
 app.get("/api/rules", (req, res) => {
@@ -2458,13 +2662,14 @@ app.get("/api/zigbee/devices/:friendlyName/methods", (req, res) => {
   const z = ensureZigbeeState();
   const device = z.devices?.[friendlyName];
   if (!friendlyName || !device) return res.status(404).json({ ok: false, error: "Zigbee device not found" });
-  const controls = zigbeeDeviceControls(device, z.values?.[friendlyName] || {});
+  const values = effectiveZigbeeValues(z.values?.[friendlyName] || {}, zigbeeDeviceRuntimeStatus(device), deviceExposeProps(device));
+  const controls = zigbeeDeviceControls(device, values);
   res.json({
     ok: true,
     friendlyName,
     topicSet: `${getZigbeeBaseTopic()}/${friendlyName}/set`,
     topicGet: `${getZigbeeBaseTopic()}/${friendlyName}/get`,
-    state: z.values?.[friendlyName] || {},
+    state: values,
     controls,
     writableControls: controls.filter(control => control.writable),
     readOnlyControls: controls.filter(control => !control.writable),
@@ -2972,6 +3177,365 @@ app.get("/api/ir/learn/result", (req, res) => {
     ready,
     code: ready ? current : null
   });
+});
+
+// =====================================================================
+// Интеграция с Яндекс Алисой — провайдер «Умный дом» (Smart Home API)
+// Документация протокола: yandex.ru/dev/dialogs/smart-home
+// OAuth 2.0 (привязка аккаунта) + 4 эндпоинта устройств под /alice/v1.0.
+// Каждое устройство приводится к тем же действиям, что и кнопка в UI.
+// =====================================================================
+const crypto = require("crypto");
+
+const ALICE = {
+  clientId: process.env.ALICE_CLIENT_ID || "",
+  clientSecret: process.env.ALICE_CLIENT_SECRET || "",
+  password: process.env.ALICE_PASSWORD || "",
+  userId: process.env.ALICE_USER_ID || "home"
+};
+const aliceConfigured = () => !!(ALICE.clientId && ALICE.clientSecret && ALICE.password);
+const aliceCodes = new Map(); // authorization code -> { redirectUri, exp } (короткоживущие, в памяти)
+const aliceRandom = (n = 32) => crypto.randomBytes(n).toString("hex");
+const aliceReqId = (req) => req.headers["x-request-id"] || aliceRandom(8);
+function aliceBearer(req) {
+  const m = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
+  return m ? m[1] : null;
+}
+function aliceAuthed(req) {
+  const t = aliceBearer(req);
+  return !!t && state.aliceAuth && t === state.aliceAuth.accessToken;
+}
+
+// ---- Описания устройств (статическая часть) ----
+const ALICE_LAMPS = [
+  { id: "relay:prihozhaya", tag: "prihozhaya", code: 11868689, name: "Свет в прихожей", room: "Прихожая" },
+  { id: "relay:holl", tag: "holl", code: 11868689, name: "Свет в зале", room: "Зал" },
+  { id: "relay:kitchen", tag: "kitchen", code: 11868689, name: "Свет на кухне", room: "Кухня" },
+  { id: "relay:bath", tag: "bath", code: 11868689, name: "Свет в ванной", room: "Ванная" },
+  { id: "relay:garderob", tag: "garderob", code: 11868692, name: "Свет в гардеробной", room: "Гардероб" }
+];
+const ALICE_BLINDS = [
+  { id: "blind:kitchen", zone: "kitchen", name: "Шторы на кухне", room: "Кухня" },
+  { id: "blind:holl", zone: "holl", name: "Шторы в зале", room: "Зал" },
+  { id: "blind:room", zone: "room", name: "Шторы в комнате", room: "Комната" }
+];
+const ALICE_FLOOR = [
+  { id: "floor:living", key: "living", name: "Тёплый пол в гостиной", room: "Гостиная" },
+  { id: "floor:bath", key: "bath", name: "Тёплый пол в ванной", room: "Ванная" }
+];
+const ALICE_VALVE_LABELS = {
+  "bath-hot": "Горячая вода в ванной", "bath-cold": "Холодная вода в ванной",
+  "wardrobe-hot": "Горячая вода в гардеробной", "wardrobe-cold": "Холодная вода в гардеробной"
+};
+
+const capOnOff = (retrievable = true) => ({ type: "devices.capabilities.on_off", retrievable, reportable: false });
+const capRange = (instance, unit, min, max, retrievable = true) => ({
+  type: "devices.capabilities.range", retrievable, reportable: false,
+  parameters: { instance, unit, range: { min, max, precision: 1 } }
+});
+
+// Полный список устройств для discovery (динамика: краны/ИК/сценарии).
+function aliceBuildDevices() {
+  const devices = [];
+
+  for (const l of ALICE_LAMPS) {
+    devices.push({ id: l.id, name: l.name, room: l.room, type: "devices.types.light",
+      capabilities: [capOnOff()], device_info: { manufacturer: "Pokrovka", model: "relay" } });
+  }
+
+  devices.push({
+    id: "led:strip", name: "Подсветка", type: "devices.types.light",
+    capabilities: [
+      capOnOff(),
+      capRange("brightness", "unit.percent", 0, 100),
+      { type: "devices.capabilities.color_setting", retrievable: false, reportable: false, parameters: { color_model: "rgb" } }
+    ],
+    device_info: { manufacturer: "Pokrovka", model: "led-strip" }
+  });
+
+  for (const b of ALICE_BLINDS) {
+    devices.push({ id: b.id, name: b.name, room: b.room, type: "devices.types.openable.curtain",
+      capabilities: [capOnOff(), capRange("open", "unit.percent", 0, 100)],
+      device_info: { manufacturer: "Pokrovka", model: "blinds" } });
+  }
+
+  for (const f of ALICE_FLOOR) {
+    devices.push({ id: f.id, name: f.name, room: f.room, type: "devices.types.thermostat",
+      capabilities: [capOnOff(), capRange("temperature", "unit.temperature.celsius", 15, 35)],
+      device_info: { manufacturer: "Pokrovka", model: "floor-heating" } });
+  }
+
+  const valves = (state.waterValves && typeof state.waterValves === "object") ? state.waterValves : {};
+  for (const [slot, cfg] of Object.entries(valves)) {
+    if (!cfg || !cfg.friendlyName) continue;
+    devices.push({ id: `valve:${slot}`, name: cfg.label || ALICE_VALVE_LABELS[slot] || `Кран ${slot}`,
+      type: "devices.types.openable", capabilities: [capOnOff()],
+      device_info: { manufacturer: "Pokrovka", model: "water-valve" } });
+  }
+
+  for (const remote of (Array.isArray(state.irRemotes) ? state.irRemotes : [])) {
+    for (const btn of (remote.buttons || [])) {
+      devices.push({ id: `ir:${remote.id}:${btn.id}`, name: `${remote.name}: ${btn.name}`,
+        type: "devices.types.other", capabilities: [capOnOff(false)],
+        device_info: { manufacturer: "Pokrovka", model: "ir-button" } });
+    }
+  }
+
+  for (const sc of ((state.scenarios && Array.isArray(state.scenarios.items)) ? state.scenarios.items : [])) {
+    devices.push({ id: `scene:${sc.id}`, name: `Сценарий: ${sc.name}`,
+      type: "devices.types.other", capabilities: [capOnOff()],
+      device_info: { manufacturer: "Pokrovka", model: "scenario" } });
+  }
+
+  return devices;
+}
+
+const stOnOff = (value) => ({ type: "devices.capabilities.on_off", state: { instance: "on", value: !!value } });
+const stRange = (instance, value) => ({ type: "devices.capabilities.range", state: { instance, value } });
+const valveIsOn = (fn) => {
+  const raw = String(((state.zigbee && state.zigbee.values && state.zigbee.values[fn]) || {}).state ?? "").toLowerCase();
+  return ["on", "open", "opened", "true", "1"].includes(raw);
+};
+
+// Текущее состояние одного устройства (capabilities) для query.
+function aliceDeviceState(id) {
+  const caps = [];
+  if (id.startsWith("relay:")) {
+    const l = ALICE_LAMPS.find(x => x.id === id);
+    caps.push(stOnOff(l && state.relays && state.relays[l.tag]));
+  } else if (id === "led:strip") {
+    caps.push(stOnOff(state.light && state.light.effect && state.light.effect !== "off"));
+    caps.push(stRange("brightness", (state.light && typeof state.light.brightness === "number") ? state.light.brightness : 0));
+  } else if (id.startsWith("blind:")) {
+    const b = ALICE_BLINDS.find(x => x.id === id);
+    const pos = (b && state.blinds && typeof state.blinds[b.zone] === "number") ? state.blinds[b.zone] : 0;
+    const open = 100 - pos; // у нас 0=открыто,100=закрыто → у Яндекса open%: 100=открыто
+    caps.push(stOnOff(open > 0));
+    caps.push(stRange("open", open));
+  } else if (id.startsWith("floor:")) {
+    const f = ALICE_FLOOR.find(x => x.id === id);
+    const cur = (f && state.floor && state.floor[f.key]) || { on: false, temp: 20 };
+    caps.push(stOnOff(cur.on));
+    caps.push(stRange("temperature", typeof cur.temp === "number" ? cur.temp : 20));
+  } else if (id.startsWith("valve:")) {
+    const slot = id.slice("valve:".length);
+    const fn = ((state.waterValves || {})[slot] || {}).friendlyName;
+    caps.push(stOnOff(fn ? valveIsOn(fn) : false));
+  } else if (id.startsWith("scene:")) {
+    const sid = id.slice("scene:".length);
+    caps.push(stOnOff(state.scenarios && state.scenarios.activeScenarioId === sid));
+  }
+  return caps;
+}
+
+// Выполнение одной capability. Возвращает action_result.
+async function aliceExecCapability(id, cap) {
+  const inst = cap.state && cap.state.instance;
+  const val = cap.state && cap.state.value;
+  const rel = !!(cap.state && cap.state.relative);
+
+  if (id.startsWith("relay:")) {
+    const l = ALICE_LAMPS.find(x => x.id === id);
+    const want = !!val;
+    if (!!(state.relays && state.relays[l.tag]) !== want) {
+      const resp = await sendToArduino(`relay?code=${l.code}`);
+      if (resp === null) throw new Error("arduino");
+      state.relays = state.relays || {}; state.relays[l.tag] = want;
+    }
+    return { instance: "on" };
+  }
+
+  if (id === "led:strip") {
+    if (cap.type === "devices.capabilities.on_off") {
+      const eff = val ? "on" : "off";
+      if ((await sendToArduino(eff)) === null) throw new Error("arduino");
+      state.light.effect = eff;
+      return { instance: "on" };
+    }
+    if (cap.type === "devices.capabilities.range" && inst === "brightness") {
+      let b = rel ? (Number(state.light.brightness) || 0) + Number(val) : Number(val);
+      b = Math.max(0, Math.min(100, Math.round(b)));
+      if ((await sendToArduino(`brightness?val=${b}`)) === null) throw new Error("arduino");
+      state.light.brightness = b;
+      return { instance: "brightness" };
+    }
+    if (cap.type === "devices.capabilities.color_setting") {
+      const n = Number(val) || 0;
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      if ((await sendToArduino(`color?r=${r}&g=${g}&b=${b}`)) === null) throw new Error("arduino");
+      state.light.rgb = { r, g, b };
+      return { instance: "rgb" };
+    }
+  }
+
+  if (id.startsWith("blind:")) {
+    const bl = ALICE_BLINDS.find(x => x.id === id);
+    state.blinds = state.blinds || {};
+    if (cap.type === "devices.capabilities.on_off") {
+      state.blinds[bl.zone] = val ? 0 : 100; // вкл = открыть
+      return { instance: "on" };
+    }
+    if (cap.type === "devices.capabilities.range" && inst === "open") {
+      const curOpen = 100 - (Number(state.blinds[bl.zone]) || 0);
+      let open = rel ? curOpen + Number(val) : Number(val);
+      open = Math.max(0, Math.min(100, Math.round(open)));
+      state.blinds[bl.zone] = 100 - open;
+      return { instance: "open" };
+    }
+  }
+
+  if (id.startsWith("floor:")) {
+    const f = ALICE_FLOOR.find(x => x.id === id);
+    state.floor[f.key] = state.floor[f.key] || { on: false, temp: 20 };
+    const cur = state.floor[f.key];
+    if (cap.type === "devices.capabilities.on_off") {
+      state.floor[f.key] = { on: !!val, temp: cur.temp };
+      return { instance: "on" };
+    }
+    if (cap.type === "devices.capabilities.range" && inst === "temperature") {
+      let t = rel ? (Number(cur.temp) || 20) + Number(val) : Number(val);
+      t = Math.max(15, Math.min(35, Math.round(t)));
+      state.floor[f.key] = { on: cur.on, temp: t };
+      return { instance: "temperature" };
+    }
+  }
+
+  if (id.startsWith("valve:")) {
+    const slot = id.slice("valve:".length);
+    const fn = ((state.waterValves || {})[slot] || {}).friendlyName;
+    if (!fn) throw new Error("not linked");
+    const v = resolveTargetStateValues(fn);
+    await zigbeePublish(`${fn}/set`, { state: val ? v.on : v.off });
+    return { instance: "on" };
+  }
+
+  if (id.startsWith("ir:")) {
+    const [, remoteId, btnId] = id.split(":");
+    const remote = (state.irRemotes || []).find(r => r.id === remoteId);
+    const btn = remote && (remote.buttons || []).find(b => b.id === btnId);
+    if (!remote || !btn) throw new Error("ir not found");
+    if (val) await zigbeePublish(`${remote.blaster}/set`, { ir_code_to_send: btn.code });
+    return { instance: "on" };
+  }
+
+  if (id.startsWith("scene:")) {
+    const sid = id.slice("scene:".length);
+    if (val) {
+      const sc = await applyScenario(sid, "alice");
+      if (!sc) throw new Error("unknown scenario");
+    }
+    return { instance: "on" };
+  }
+
+  throw new Error("unknown device");
+}
+
+// ---- OAuth 2.0 (привязка аккаунта Яндекса) ----
+function aliceLoginPage({ redirectUri, stateParam, error }) {
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Покровка · вход для Алисы</title>
+<style>body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1120;color:#e8eaf2;display:flex;min-height:100vh;align-items:center;justify-content:center}
+.card{width:340px;background:#171a2c;border:1px solid #2a2b46;border-radius:18px;padding:26px}
+h1{font-size:18px;margin:0 0 4px}p{color:#8b8fa7;font-size:13px;margin:0 0 18px}
+input{width:100%;box-sizing:border-box;background:#0f1120;border:1px solid #2a2b46;border-radius:12px;padding:12px;color:#e8eaf2;font-size:15px;outline:none}
+input:focus{border-color:#3b82f6}button{width:100%;margin-top:14px;background:#2563eb;border:0;border-radius:12px;padding:12px;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+button:hover{background:#3b82f6}.err{color:#f87171;font-size:13px;margin-top:10px}.logo{font-size:26px;margin-bottom:8px}</style></head>
+<body><form class="card" method="post" action="/alice/oauth/authorize">
+<div class="logo">🏠</div><h1>Покровка · Умный дом</h1>
+<p>Введите пароль дома, чтобы привязать навык Алисы.</p>
+<input type="password" name="password" placeholder="Пароль дома" autofocus autocomplete="current-password">
+<input type="hidden" name="redirect_uri" value="${String(redirectUri || "").replace(/"/g, "&quot;")}">
+<input type="hidden" name="state" value="${String(stateParam || "").replace(/"/g, "&quot;")}">
+<button type="submit">Привязать</button>
+${error ? `<div class="err">${error}</div>` : ""}
+</form></body></html>`;
+}
+
+app.get("/alice/oauth/authorize", (req, res) => {
+  if (!aliceConfigured()) return res.status(503).send("Alice integration is not configured");
+  if (req.query.client_id !== ALICE.clientId) return res.status(400).send("invalid client_id");
+  res.set("Content-Type", "text/html; charset=utf-8");
+  res.send(aliceLoginPage({ redirectUri: req.query.redirect_uri, stateParam: req.query.state }));
+});
+
+app.post("/alice/oauth/authorize", (req, res) => {
+  if (!aliceConfigured()) return res.status(503).send("Alice integration is not configured");
+  const { password, redirect_uri, state: stateParam } = req.body || {};
+  if (password !== ALICE.password) {
+    res.set("Content-Type", "text/html; charset=utf-8");
+    return res.status(401).send(aliceLoginPage({ redirectUri: redirect_uri, stateParam, error: "Неверный пароль" }));
+  }
+  const code = aliceRandom(24);
+  aliceCodes.set(code, { redirectUri: redirect_uri, exp: Date.now() + 10 * 60 * 1000 });
+  const sep = String(redirect_uri).includes("?") ? "&" : "?";
+  res.redirect(302, `${redirect_uri}${sep}code=${encodeURIComponent(code)}&state=${encodeURIComponent(stateParam || "")}`);
+});
+
+app.post("/alice/oauth/token", (req, res) => {
+  if (!aliceConfigured()) return res.status(503).json({ error: "not_configured" });
+  const b = req.body || {};
+  if (b.client_id !== ALICE.clientId || b.client_secret !== ALICE.clientSecret) {
+    return res.status(401).json({ error: "invalid_client" });
+  }
+  if (b.grant_type === "authorization_code") {
+    const rec = aliceCodes.get(b.code);
+    if (!rec || rec.exp < Date.now()) return res.status(400).json({ error: "invalid_grant" });
+    aliceCodes.delete(b.code);
+  } else if (b.grant_type === "refresh_token") {
+    if (!b.refresh_token || b.refresh_token !== (state.aliceAuth && state.aliceAuth.refreshToken)) {
+      return res.status(400).json({ error: "invalid_grant" });
+    }
+  } else {
+    return res.status(400).json({ error: "unsupported_grant_type" });
+  }
+  const accessToken = aliceRandom(32);
+  const refreshToken = aliceRandom(32);
+  state.aliceAuth = { accessToken, refreshToken };
+  saveState();
+  res.json({ access_token: accessToken, token_type: "bearer", expires_in: 31536000, refresh_token: refreshToken });
+});
+
+// ---- Smart Home API ----
+app.head("/alice/v1.0", (req, res) => res.status(200).end());
+app.get("/alice/v1.0", (req, res) => res.json({ ok: true }));
+
+app.post("/alice/v1.0/user/unlink", (req, res) => {
+  if (aliceAuthed(req)) { state.aliceAuth = { accessToken: null, refreshToken: null }; saveState(); }
+  res.json({ request_id: aliceReqId(req) });
+});
+
+app.get("/alice/v1.0/user/devices", (req, res) => {
+  if (!aliceAuthed(req)) return res.status(401).json({ request_id: aliceReqId(req) });
+  res.json({ request_id: aliceReqId(req), payload: { user_id: ALICE.userId, devices: aliceBuildDevices() } });
+});
+
+app.post("/alice/v1.0/user/devices/query", (req, res) => {
+  if (!aliceAuthed(req)) return res.status(401).json({ request_id: aliceReqId(req) });
+  const asked = ((req.body && req.body.devices) || []);
+  const devices = asked.map(d => ({ id: d.id, capabilities: aliceDeviceState(d.id) }));
+  res.json({ request_id: aliceReqId(req), payload: { devices } });
+});
+
+app.post("/alice/v1.0/user/devices/action", async (req, res) => {
+  if (!aliceAuthed(req)) return res.status(401).json({ request_id: aliceReqId(req) });
+  const asked = ((req.body && req.body.payload && req.body.payload.devices) || []);
+  const devices = [];
+  for (const d of asked) {
+    const caps = [];
+    for (const cap of (d.capabilities || [])) {
+      try {
+        const r = await aliceExecCapability(d.id, cap);
+        caps.push({ type: cap.type, state: { instance: r.instance, action_result: { status: "DONE" } } });
+      } catch (e) {
+        const inst = (cap.state && cap.state.instance) || "on";
+        caps.push({ type: cap.type, state: { instance: inst, action_result: { status: "ERROR", error_code: "DEVICE_UNREACHABLE" } } });
+      }
+    }
+    devices.push({ id: d.id, capabilities: caps });
+  }
+  saveState();
+  res.json({ request_id: aliceReqId(req), payload: { devices } });
 });
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
