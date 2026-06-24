@@ -81,7 +81,7 @@ const LightEffects: React.FC = () => {
             className={`py-2.5 px-4 rounded-lg font-medium text-gray-150 text-sm transition-all duration-150 border-2
               ${active === idx ? "bg-blue-700 border-blue-400 shadow-xl" : "bg-[#1a1b2d] border-[#232445]"}
               hover:bg-blue-900 hover:border-blue-500 disabled:opacity-60`}
-            style={{ minWidth: 120, letterSpacing: 0.1 }}
+            style={{ letterSpacing: 0.1 }}
             disabled={loadingIdx !== null}
           >
             {loadingIdx === idx ? "..." : name}

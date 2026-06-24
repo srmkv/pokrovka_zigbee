@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { iconByWmo } from "./WeatherIconMap"; // новый мэппинг WMO → имя файла
 import Clock from "./Clock";
 
@@ -17,7 +17,24 @@ const CLOCK_SIZE = 545;
 const CLOCK_RADIUS = 240;
 const CENTER = CLOCK_SIZE / 2;
 
+// Доступная ширина для часов (минус поля по краям экрана)
+const VIEWPORT_MARGIN = 24;
+
 const WeatherClock: React.FC<WeatherClockProps> = ({ hours }) => {
+  // Масштаб часов под ширину экрана: на десктопе 1, на телефоне < 1
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const updateScale = () => {
+      const available = Math.min(CLOCK_SIZE, window.innerWidth - VIEWPORT_MARGIN);
+      setScale(Math.min(1, available / CLOCK_SIZE));
+    };
+    updateScale();
+    window.addEventListener("resize", updateScale);
+    return () => window.removeEventListener("resize", updateScale);
+  }, []);
+
   if (!hours || !hours.length) {
     return (
       <div className="flex items-center justify-center h-72 text-lg text-gray-350">
@@ -29,8 +46,17 @@ const WeatherClock: React.FC<WeatherClockProps> = ({ hours }) => {
   const currentHour = new Date().getHours();
 
   return (
-    <div style={{ width: CLOCK_SIZE, height: CLOCK_SIZE, position: "relative" }}>
-      <svg width={CLOCK_SIZE} height={CLOCK_SIZE}>
+    <div style={{ width: CLOCK_SIZE * scale, height: CLOCK_SIZE * scale, position: "relative" }}>
+      <div
+        style={{
+          width: CLOCK_SIZE,
+          height: CLOCK_SIZE,
+          position: "relative",
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+        }}
+      >
+        <svg width={CLOCK_SIZE} height={CLOCK_SIZE}>
         <circle
           cx={CENTER}
           cy={CENTER}
@@ -138,7 +164,8 @@ const WeatherClock: React.FC<WeatherClockProps> = ({ hours }) => {
         <g>
           <Clock fontSize={38} />
         </g>
-      </svg>
+        </svg>
+      </div>
     </div>
   );
 };

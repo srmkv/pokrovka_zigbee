@@ -62,7 +62,7 @@ const SensorEditorModal: React.FC<{
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 px-4">
-      <div className="w-full max-w-4xl rounded-2xl border border-[#2a2b46] bg-[#16182a] p-5 shadow-2xl">
+      <div className="w-full max-w-sm md:max-w-2xl lg:max-w-4xl rounded-2xl border border-[#2a2b46] bg-[#16182a] p-5 shadow-2xl">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <div className="text-xl font-semibold text-gray-100">

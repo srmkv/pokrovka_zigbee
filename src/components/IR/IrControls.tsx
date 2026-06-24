@@ -92,7 +92,7 @@ const IrControls: React.FC = () => {
               </div>
 
               {/* Кнопки */}
-              <div className="grid grid-cols-3 gap-2 p-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4">
                 {remote.buttons.map((b) => {
                   const isSent = sent === b.id;
                   const isBusy = busy === b.id;

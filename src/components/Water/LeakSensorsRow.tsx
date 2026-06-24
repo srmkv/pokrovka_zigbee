@@ -17,13 +17,13 @@ const LeakSensorsRow: React.FC = () => {
   const visible = sensors.slice(0, 6);
 
   return (
-    <div className="w-full flex items-center justify-center gap-5 mt-2 py-1 border-t border-gray-600/30">
+    <div className="w-full flex items-center justify-start sm:justify-center gap-2 sm:gap-5 mt-2 py-1 border-t border-gray-600/30 overflow-x-auto no-scrollbar">
       {visible.map((sensor) => {
         const state = sensor.state?.status || "unknown";
         const color = state === "leak" ? "#ef4444" : state === "dry" ? "#7A5A3A" : "#8F8375";
         const common = { width: 32, height: 32, color };
         return (
-          <div key={sensor.id} className="flex flex-col items-center text-xs min-w-[54px]">
+          <div key={sensor.id} className="flex flex-col items-center text-xs min-w-[54px] shrink-0">
             <div className="theme-adaptive-icon h-8 flex items-center justify-center">
               {sensor.icon === "washing-machine" ? (
                 <WashingMachineSvg {...common} />

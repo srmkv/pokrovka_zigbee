@@ -54,8 +54,7 @@ const WeekForecast: React.FC<WeekForecastProps> = React.memo(({ lat, lon, days =
           return (
             <div
               key={`${d.date}-${d.wcode ?? "x"}`}
-              className="flex-shrink-0 flex flex-col items-center bg-[#22243c] rounded-lg py-4 px-4 min-w-[100px] max-w-[120px]"
-              style={{ width: 110 }}
+              className="flex-shrink-0 flex flex-col items-center bg-[#22243c] rounded-lg py-4 px-4 min-w-[88px] sm:min-w-[100px] max-w-[120px]"
             >
               <span className="font-semibold text-gray-150">{title}</span>
               <img

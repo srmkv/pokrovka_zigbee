@@ -882,3 +882,33 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===============================
+   Мобильная адаптация
+   =============================== */
+
+/* Горизонтальные ленты (вкладки, чипы): прячем скроллбар, оставляя прокрутку */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Никакого горизонтального «выезда» страницы на узких экранах */
+html,
+body {
+  overflow-x: hidden;
+}
+
+@media (max-width: 1023px) {
+  /* Учёт вырезов/жестов на телефонах только в мобильной раскладке */
+  @supports (padding: env(safe-area-inset-left)) {
+    .app-content {
+      padding-left: max(0.75rem, env(safe-area-inset-left));
+      padding-right: max(0.75rem, env(safe-area-inset-right));
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+  }
+}

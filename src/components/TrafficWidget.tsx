@@ -51,9 +51,9 @@ const TrafficWidget: React.FC = () => {
   return (
     <div
       ref={mapRef}
+      className="h-[70vh] md:h-[750px]"
       style={{
         width: "100%",
-        height: "750px",
         borderRadius: "16px",
         overflow: "hidden",
         boxShadow: "0 4px 32px #0002",

@@ -127,7 +127,7 @@ const NotificationBell: React.FC = () => {
                     <button
                       onClick={() => ack(note.id)}
                       aria-label="Закрыть"
-                      className="absolute right-2 top-2 rounded-full p-1 text-gray-400 transition hover:text-gray-100"
+                      className="absolute right-2 top-2 rounded-full p-2 text-gray-400 transition hover:bg-gray-700/30 hover:text-gray-100"
                     >
                       <svg width={16} height={16} viewBox="0 0 18 18" aria-hidden="true">
                         <line x1="4" y1="4" x2="14" y2="14" stroke="currentColor" strokeWidth="2" />

@@ -95,7 +95,7 @@ const SystemPanel: React.FC = () => {
               <div className="flex justify-between text-sm text-gray-300"><span>Disk</span><span>{disk.usedGb} / {disk.sizeGb} ГБ · {disk.usePercent}</span></div>
               <div className="mt-2 h-2 rounded-full bg-[#22243c]"><div className="h-2 rounded-full bg-emerald-500" style={{ width: disk.usePercent || "0%" }} /></div>
             </div>
-            <div className="grid grid-cols-3 gap-3 text-sm text-gray-300">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-gray-300">
               <div className="rounded-xl bg-[#181825] p-3"><div className="text-xs text-gray-500">Load 1m</div><div className="font-semibold">{Number(load[0] || 0).toFixed(2)}</div></div>
               <div className="rounded-xl bg-[#181825] p-3"><div className="text-xs text-gray-500">Load 5m</div><div className="font-semibold">{Number(load[1] || 0).toFixed(2)}</div></div>
               <div className="rounded-xl bg-[#181825] p-3"><div className="text-xs text-gray-500">Load 15m</div><div className="font-semibold">{Number(load[2] || 0).toFixed(2)}</div></div>

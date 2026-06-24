@@ -7,21 +7,54 @@ const App = () => {
     const saved = localStorage.getItem("ui-theme");
     return saved === "light" ? "light" : "dark";
   });
+  // Боковая панель: на десктопе всегда видима, на мобильном — выезжающий drawer.
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("ui-theme", theme);
   }, [theme]);
 
+  // Блокируем прокрутку фона, пока открыт мобильный drawer.
+  useEffect(() => {
+    document.body.style.overflow = navOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [navOpen]);
+
   return (
     <UiPopupProvider>
-    <div className={`app-shell flex w-full h-screen ${theme === "light" ? "theme-light" : "theme-dark"}`}>
-      {/* Сайдбар с фоном */}
-      <aside className={`app-sidebar max-w-[430px] min-w-[320px] h-screen ${theme === "light" ? "bg-[#eef3f8]" : "bg-[#100E1D]"}`}>
+    <div className={`app-shell flex w-full h-screen overflow-x-hidden ${theme === "light" ? "theme-light" : "theme-dark"}`}>
+      {/* Затемнение под мобильным drawer */}
+      {navOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      {/* Сайдбар: статичный на десктопе (lg+), выезжающий слева на мобильном */}
+      <aside
+        className={`app-sidebar fixed inset-y-0 left-0 z-40 w-[86%] max-w-[360px] overflow-y-auto custom-scroll
+          transform transition-transform duration-300 ease-out
+          lg:static lg:z-auto lg:w-auto lg:max-w-[430px] lg:min-w-[320px] lg:translate-x-0 lg:transform-none
+          h-screen ${navOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}
+          ${theme === "light" ? "bg-[#eef3f8]" : "bg-[#100E1D]"}`}
+      >
+        {/* Кнопка закрытия — только на мобильном */}
+        <button
+          type="button"
+          onClick={() => setNavOpen(false)}
+          aria-label="Закрыть"
+          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-black/25 text-lg text-gray-100 lg:hidden"
+        >
+          ✕
+        </button>
         <SideBar />
       </aside>
       {/* MainContent только с вертикальным скроллом и кастомным скроллом */}
-      <main className={`app-main flex-1 h-screen overflow-hidden custom-scroll ${theme === "light" ? "bg-[#f5f7fb]" : "bg-[#181825]"}`}>
-        <MainContent theme={theme} setTheme={setTheme} />
+      <main className={`app-main flex-1 min-w-0 h-screen overflow-hidden custom-scroll ${theme === "light" ? "bg-[#f5f7fb]" : "bg-[#181825]"}`}>
+        <MainContent theme={theme} setTheme={setTheme} onOpenNav={() => setNavOpen(true)} />
       </main>
     </div>
     </UiPopupProvider>

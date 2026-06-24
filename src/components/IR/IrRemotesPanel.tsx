@@ -353,7 +353,7 @@ const RemoteCard: React.FC<{
             Нет кнопок. Откройте ⚙ и добавьте кнопку — обучите с пульта или вставьте код.
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
             {remote.buttons.map((b) => {
               const isSent = sent === b.id;
               const isBusy = busy === b.id;

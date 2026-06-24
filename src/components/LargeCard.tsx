@@ -29,7 +29,7 @@ const LargeCard: React.FC<LargeCardProps> = ({
       <div>
         <p className="text-gray-350">{title}</p>
         <div className="mt-2 flex items-end gap-2">
-          <span className="text-6xl font-bold leading-none text-gray-150">{num}</span>
+          <span className="text-4xl sm:text-5xl md:text-6xl font-bold leading-none text-gray-150">{num}</span>
           {desc ? (
             <span className="text-4xl font-normal text-gray-250 mb-[4px]">{desc}</span>
           ) : null}

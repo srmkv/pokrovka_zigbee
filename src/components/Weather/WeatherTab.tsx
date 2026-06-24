@@ -192,7 +192,7 @@ const WeatherTab: React.FC = () => {
                   <div className="text-xs text-gray-400">макс. вероятность</div>
                 </div>
               </div>
-              <div className="grid grid-cols-6 gap-2 mt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mt-2">
                 {next12Hours.slice(0, 6).map((point) => (
                   <div key={point.time} className="rounded-lg bg-[#1b1d31] p-2 text-center">
                     <div className="text-[11px] text-gray-400">
@@ -217,7 +217,7 @@ const WeatherTab: React.FC = () => {
                   <div className="text-xs text-gray-400">УФ-индекс</div>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="rounded-lg bg-[#1b1d31] p-3">
                   <div className="text-xs text-gray-400">AQI</div>
                   <div className="text-xl font-semibold text-gray-150 mt-2">{air.current?.europeanAqi ?? "—"}</div>
@@ -254,7 +254,7 @@ const WeatherTab: React.FC = () => {
             </span>
             <div className="text-base font-semibold text-gray-150">Освещение</div>
           </div>
-          <div className="flex flex-wrap items-start justify-around gap-x-6 gap-y-3" style={{ zoom: 0.82 }}>
+          <div className="flex flex-wrap items-start justify-around gap-x-6 gap-y-3">
             <LampBulbPrihozhaya />
             <LampBulbHoll />
             <LampBulbKitchen />

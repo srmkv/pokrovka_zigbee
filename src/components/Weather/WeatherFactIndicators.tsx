@@ -109,7 +109,7 @@ const WeatherFactIndicators: React.FC<Props> = ({ lat, lon }) => {
   }, [url]);
 
   return (
-    <div className="flex flex-col items-center text-gray-350 text-lg mt-2 space-y-1">
+    <div className="flex flex-col items-center text-gray-350 text-base sm:text-lg mt-2 space-y-1">
       {err && <div className="text-red-400 text-sm">Ошибка погоды: {err}</div>}
       <div>💧 Влажность: {hum != null ? `${round(hum)}%` : "--"}</div>
       <div>🌡 Давление: {pressMm != null ? `${round(pressMm)} мм` : "--"}</div>

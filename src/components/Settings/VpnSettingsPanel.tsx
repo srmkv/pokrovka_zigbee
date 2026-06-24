@@ -86,7 +86,7 @@ export default function VpnSettingsPanel() {
       </div>
 
       {isActive && status?.address && (
-        <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-gray-300">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-300">
           <div className="rounded-xl bg-[#181825] p-2"><span className="text-gray-500">Адрес</span><br />{status.address}</div>
           <div className="rounded-xl bg-[#181825] p-2"><span className="text-gray-500">Интерфейс</span><br />{status.interface || "awg0"}</div>
         </div>
