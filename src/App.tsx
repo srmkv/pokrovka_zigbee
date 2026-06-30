@@ -13,6 +13,11 @@ const App = () => {
 
   useEffect(() => {
     localStorage.setItem("ui-theme", theme);
+    // Держим фон <html> и theme-color в синхроне с темой (см. также public/index.html).
+    const bg = { dark: "#181825", light: "#ece2d4", midnight: "#04060c", day: "#eaf1fa" }[theme] || "#181825";
+    document.documentElement.style.backgroundColor = bg;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", bg);
   }, [theme]);
 
   // Блокируем прокрутку фона, пока открыт мобильный drawer.

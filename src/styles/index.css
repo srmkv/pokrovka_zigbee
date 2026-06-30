@@ -1547,3 +1547,16 @@ body {
   color: #ffffff;
   box-shadow: 0 14px 28px rgba(2, 132, 199, 0.24);
 }
+
+/* Доступность: уважаем системную настройку «меньше движения».
+   Гасим анимации/переходы (пульсации статусов, blur-фоны нагружают и GPU NanoPi). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
