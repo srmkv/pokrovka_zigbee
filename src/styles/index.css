@@ -1560,3 +1560,74 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ===============================================================
+   Семантические токены тем (--c-*) — единый источник цвета.
+   НОВЫЕ компоненты используют классы bg-card / bg-panel / bg-surface /
+   border-line / text-ink / text-ink-soft / text-ink-muted / text-accent
+   (заданы в tailwind.config.js как var(--c-*)) вместо сырых hex.
+   Тогда компонент темится во ВСЕХ темах сам, без правок в блоках .theme-*.
+
+   Значения подобраны 1:1 под текущий вид, поэтому перевод существующих
+   компонентов на токены ничего не меняет визуально. Базовые (:root) — тёмная
+   тема; .theme-* переопределяют под свою палитру.
+   =============================================================== */
+:root {
+  --c-surface: #181825;
+  --c-surface-deep: #100e1d;
+  --c-card: #1e213a; /* = bg-darkblue */
+  --c-panel: #1b1d31;
+  --c-panel-2: #131522;
+  --c-inset: #22243c;
+  --c-inset-2: #111322;
+  --c-line: #2a2b46;
+  --c-ink: #e7e7eb; /* = gray-150 */
+  --c-ink-soft: #a09fb1; /* = gray-250 */
+  --c-ink-muted: #88869d; /* = gray-350 */
+  --c-accent: #3b82f6; /* blue-500 */
+}
+
+.theme-light {
+  --c-surface: var(--light-bg-2);
+  --c-surface-deep: var(--light-bg);
+  --c-card: var(--light-panel);
+  --c-panel: var(--light-panel-soft);
+  --c-panel-2: var(--light-panel);
+  --c-inset: var(--light-panel-muted);
+  --c-inset-2: var(--light-panel-soft);
+  --c-line: var(--light-border);
+  --c-ink: var(--light-text);
+  --c-ink-soft: var(--light-text-soft);
+  --c-ink-muted: var(--light-text-muted);
+  --c-accent: var(--light-accent);
+}
+
+.theme-day {
+  --c-surface: var(--day-bg-2);
+  --c-surface-deep: var(--day-bg);
+  --c-card: var(--day-panel);
+  --c-panel: var(--day-panel-soft);
+  --c-panel-2: var(--day-panel);
+  --c-inset: var(--day-panel-muted);
+  --c-inset-2: var(--day-panel-soft);
+  --c-line: var(--day-border);
+  --c-ink: var(--day-text);
+  --c-ink-soft: var(--day-text-soft);
+  --c-ink-muted: var(--day-text-muted);
+  --c-accent: var(--day-accent);
+}
+
+.theme-midnight {
+  --c-surface: var(--mid-bg-2);
+  --c-surface-deep: var(--mid-bg);
+  --c-card: var(--mid-panel);
+  --c-panel: var(--mid-panel-soft);
+  --c-panel-2: var(--mid-panel);
+  --c-inset: var(--mid-panel-muted);
+  --c-inset-2: var(--mid-panel-soft);
+  --c-line: var(--mid-border);
+  --c-ink: var(--mid-text);
+  --c-ink-soft: var(--mid-text-soft);
+  --c-ink-muted: var(--mid-text-muted);
+  --c-accent: var(--mid-accent);
+}

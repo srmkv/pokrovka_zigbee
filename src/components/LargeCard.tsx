@@ -21,8 +21,8 @@ const LargeCard: React.FC<LargeCardProps> = ({
   return (
     <div
       className={
-        `bg-darkblue rounded-xl py-5 px-6 flex flex-col justify-between
-         border border-[#2a2b46] shadow-sm ${className}`
+        `bg-card rounded-xl py-5 px-6 flex flex-col justify-between
+         border border-line shadow-sm ${className}`
       }
       style={{ minHeight }}
     >

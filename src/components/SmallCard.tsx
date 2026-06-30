@@ -14,7 +14,7 @@ const SmallCard: React.FC<SmallCardProps> = ({
   temp,
 }) => {
   return (
-    <div className="bg-darkblue py-4 px-5 flex flex-col items-center space-y-4">
+    <div className="bg-card py-4 px-5 flex flex-col items-center space-y-4">
       <p>{dayTitle}</p>
       {/* img — это уже ПОЛНЫЙ путь! */}
       <img src={img} alt="weather-icon" className="max-h-16" />

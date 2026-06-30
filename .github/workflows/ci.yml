@@ -1,0 +1,32 @@
+name: CI
+
+# Лёгкий гейт перед деплоем: строгая проверка типов + продакшн-сборка.
+# Ловит поломки типов/импортов/CSS до того, как они попадут на NanoPi.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Type-check (strict)
+        run: npx tsc --noEmit
+
+      - name: Production build
+        # CI=false — предупреждения eslint не валят сборку; реальные ошибки валят.
+        run: CI=false GENERATE_SOURCEMAP=false npm run build
