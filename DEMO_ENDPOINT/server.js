@@ -330,7 +330,9 @@ function loadState() {
 
 function saveState() {
   try {
-    fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
+    // mode 0600: в state.json лежат секреты (telegram-токен, alice-токены) — не даём читать чужим.
+    fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2), { mode: 0o600 });
+    try { fs.chmodSync(STATE_PATH, 0o600); } catch (_) {} // на случай уже существующего файла
   } catch (e) {
     console.warn("Ошибка сохранения state.json:", e);
   }
@@ -445,7 +447,8 @@ function isSensorInMaintenance(sensorOrState) {
 
 function sanitizeTelegramSettings(settings = state.settings?.telegram || {}) {
   const token = String(settings.botToken || "");
-  const maskedToken = token ? `${token.slice(0, 6)}...${token.slice(-4)}` : "";
+  // Маскируем всё, кроме последних 4 символов (первые символы = numeric bot id — не раскрываем).
+  const maskedToken = token ? `••••${token.slice(-4)}` : "";
   return {
     enabled: !!settings.enabled,
     botTokenSet: !!token,
@@ -2043,7 +2046,19 @@ function zigbeeStatusResponse() {
   };
 }
 
-app.use(cors());
+// CORS: пускаем only same-origin (нет заголовка Origin) и явный allow-list.
+// SPA ходит на /api в ТОМ ЖЕ origin (REACT_APP_API_BASE=/api), поэтому ограничение
+// её не ломает — закрываем только межсайтовые браузерные запросы (CSRF).
+// Список настраивается через env CORS_ORIGINS (через запятую).
+const CORS_ALLOW = (process.env.CORS_ORIGINS ||
+  "https://home.system-logos.ru,http://localhost:3000,http://localhost:3010")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin || CORS_ALLOW.includes(origin)) return cb(null, true);
+    return cb(null, false); // чужой origin — без CORS-заголовков
+  },
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false })); // для OAuth-форм Яндекс Алисы
 loadState();
@@ -2681,6 +2696,7 @@ app.post("/api/zigbee/devices/:friendlyName/set", async (req, res) => {
   try {
     const friendlyName = decodeURIComponent(req.params.friendlyName || "");
     if (!friendlyName) return res.status(400).json({ ok: false, error: "friendlyName is required" });
+    if (/[#+]/.test(friendlyName)) return res.status(400).json({ ok: false, error: "Недопустимые символы в имени устройства" });
     const payload = req.body?.payload && typeof req.body.payload === "object" ? req.body.payload : (req.body || {});
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
       return res.status(400).json({ ok: false, error: "JSON object payload is required" });
@@ -2696,6 +2712,7 @@ app.post("/api/zigbee/devices/:friendlyName/get", async (req, res) => {
   try {
     const friendlyName = decodeURIComponent(req.params.friendlyName || "");
     if (!friendlyName) return res.status(400).json({ ok: false, error: "friendlyName is required" });
+    if (/[#+]/.test(friendlyName)) return res.status(400).json({ ok: false, error: "Недопустимые символы в имени устройства" });
     const payload = req.body?.payload && typeof req.body.payload === "object" ? req.body.payload : (req.body || {});
     await zigbeePublish(`${friendlyName}/get`, payload);
     res.json({ ok: true, friendlyName, payload });
@@ -3452,9 +3469,32 @@ ${error ? `<div class="err">${error}</div>` : ""}
 </form></body></html>`;
 }
 
+// Constant-time сравнение секретов (против тайминг-атак).
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a ?? ""), "utf8");
+  const bb = Buffer.from(String(b ?? ""), "utf8");
+  if (ba.length !== bb.length) return false;
+  try { return crypto.timingSafeEqual(ba, bb); } catch (_) { return false; }
+}
+
+// Простой in-memory лимитер попыток входа Алисы (без внешних зависимостей).
+// За прокси req.ip = адрес прокси, поэтому бакет фактически глобальный — но он и
+// нужен лишь чтобы сбить брутфорс пароля (МАХ попыток в окне на всех вместе).
+const aliceLoginHits = new Map();
+function aliceLoginRateLimited(req) {
+  const ip = req.ip || req.connection?.remoteAddress || "unknown";
+  const now = Date.now();
+  const WINDOW = 10 * 60 * 1000;
+  const MAX = 10;
+  let rec = aliceLoginHits.get(ip);
+  if (!rec || rec.resetAt < now) { rec = { count: 0, resetAt: now + WINDOW }; aliceLoginHits.set(ip, rec); }
+  rec.count += 1;
+  return rec.count > MAX;
+}
+
 app.get("/alice/oauth/authorize", (req, res) => {
   if (!aliceConfigured()) return res.status(503).send("Alice integration is not configured");
-  if (req.query.client_id !== ALICE.clientId) return res.status(400).send("invalid client_id");
+  if (!safeEqual(req.query.client_id, ALICE.clientId)) return res.status(400).send("invalid client_id");
   res.set("Content-Type", "text/html; charset=utf-8");
   res.send(aliceLoginPage({ redirectUri: req.query.redirect_uri, stateParam: req.query.state }));
 });
@@ -3462,7 +3502,11 @@ app.get("/alice/oauth/authorize", (req, res) => {
 app.post("/alice/oauth/authorize", (req, res) => {
   if (!aliceConfigured()) return res.status(503).send("Alice integration is not configured");
   const { password, redirect_uri, state: stateParam } = req.body || {};
-  if (password !== ALICE.password) {
+  if (aliceLoginRateLimited(req)) {
+    res.set("Content-Type", "text/html; charset=utf-8");
+    return res.status(429).send(aliceLoginPage({ redirectUri: redirect_uri, stateParam, error: "Слишком много попыток, подождите" }));
+  }
+  if (!safeEqual(password, ALICE.password)) {
     res.set("Content-Type", "text/html; charset=utf-8");
     return res.status(401).send(aliceLoginPage({ redirectUri: redirect_uri, stateParam, error: "Неверный пароль" }));
   }
@@ -3475,7 +3519,7 @@ app.post("/alice/oauth/authorize", (req, res) => {
 app.post("/alice/oauth/token", (req, res) => {
   if (!aliceConfigured()) return res.status(503).json({ error: "not_configured" });
   const b = req.body || {};
-  if (b.client_id !== ALICE.clientId || b.client_secret !== ALICE.clientSecret) {
+  if (!safeEqual(b.client_id, ALICE.clientId) || !safeEqual(b.client_secret, ALICE.clientSecret)) {
     return res.status(401).json({ error: "invalid_client" });
   }
   if (b.grant_type === "authorization_code") {
@@ -3483,7 +3527,7 @@ app.post("/alice/oauth/token", (req, res) => {
     if (!rec || rec.exp < Date.now()) return res.status(400).json({ error: "invalid_grant" });
     aliceCodes.delete(b.code);
   } else if (b.grant_type === "refresh_token") {
-    if (!b.refresh_token || b.refresh_token !== (state.aliceAuth && state.aliceAuth.refreshToken)) {
+    if (!b.refresh_token || !state.aliceAuth?.refreshToken || !safeEqual(b.refresh_token, state.aliceAuth.refreshToken)) {
       return res.status(400).json({ error: "invalid_grant" });
     }
   } else {
