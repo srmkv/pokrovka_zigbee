@@ -826,7 +826,7 @@
   color: #8f3024;
 }
 
-.dark .vpn-settings-panel {
+.theme-dark .vpn-settings-panel {
   border-color: rgba(156, 116, 74, 0.26);
   background:
     radial-gradient(circle at 12% 0%, rgba(180, 132, 80, 0.18), transparent 34%),
@@ -835,20 +835,20 @@
   color: #f5efe8;
 }
 
-.dark .vpn-settings-header h3,
-.dark .vpn-info-tile strong {
+.theme-dark .vpn-settings-header h3,
+.theme-dark .vpn-info-tile strong {
   color: #fff8ed;
 }
 
-.dark .vpn-settings-header p:not(.vpn-settings-kicker),
-.dark .vpn-state-badge {
+.theme-dark .vpn-settings-header p:not(.vpn-settings-kicker),
+.theme-dark .vpn-state-badge {
   color: #d2c4b5;
 }
 
-.dark .vpn-info-tile,
-.dark .vpn-state-badge,
-.dark .vpn-secondary-button,
-.dark .vpn-ghost-button {
+.theme-dark .vpn-info-tile,
+.theme-dark .vpn-state-badge,
+.theme-dark .vpn-secondary-button,
+.theme-dark .vpn-ghost-button {
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -911,4 +911,639 @@ body {
       padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
     }
   }
+}
+
+/* ===============================
+   Тема «Ночь» (Midnight): почти чёрный фон + холодный циан-акцент.
+   Тёмное семейство — переопределяем тёмные hex-классы в более глубокие тона,
+   синий акцент заменяем циан-вариантом, статусные цвета сохраняем для семантики.
+   =============================== */
+.theme-midnight {
+  --mid-bg: #04060c;
+  --mid-bg-2: #070b14;
+  --mid-panel: #0c111d;
+  --mid-panel-soft: #0f1626;
+  --mid-panel-muted: #111a2c;
+  --mid-border: #163049;
+  --mid-border-strong: #1d425f;
+  --mid-text: #e8f1fb;
+  --mid-text-soft: #aebfd2;
+  --mid-text-muted: #8294ac;
+  --mid-accent: #38bdf8;
+  --mid-accent-2: #22d3ee;
+  --mid-glow: rgba(56, 189, 248, 0.16);
+  --mid-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  --mid-shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.42);
+  color: var(--mid-text);
+  background:
+    radial-gradient(circle at 14% 6%, rgba(56, 189, 248, 0.10), transparent 30%),
+    radial-gradient(circle at 86% 12%, rgba(34, 211, 238, 0.07), transparent 32%),
+    linear-gradient(160deg, #04060c 0%, #060912 55%, #04070e 100%);
+}
+
+.theme-midnight .app-shell {
+  background:
+    radial-gradient(circle at 80% 0%, rgba(56, 189, 248, 0.08), transparent 34%),
+    linear-gradient(160deg, #04060c 0%, #060911 60%, #04070e 100%) !important;
+}
+
+.theme-midnight main.app-main {
+  background:
+    radial-gradient(circle at 16% 10%, rgba(34, 211, 238, 0.07), transparent 28%),
+    radial-gradient(circle at 88% 4%, rgba(56, 189, 248, 0.07), transparent 30%),
+    linear-gradient(160deg, #05070e 0%, #04060c 100%) !important;
+}
+
+.theme-midnight aside.app-sidebar {
+  background: linear-gradient(180deg, #070b15 0%, #04060d 100%) !important;
+  border-right: 1px solid rgba(56, 189, 248, 0.12) !important;
+  box-shadow: 14px 0 36px rgba(0, 0, 0, 0.5) !important;
+}
+
+.theme-midnight .app-content {
+  color: var(--mid-text) !important;
+}
+
+/* Панели: тёмные hex-блоки → глубокий графит со слабой циан-рамкой */
+.theme-midnight .bg-darkblue,
+.theme-midnight .bg-\[\#131522\],
+.theme-midnight .bg-\[\#16182a\],
+.theme-midnight .bg-\[\#22243c\],
+.theme-midnight .bg-\[\#1a1b2d\],
+.theme-midnight .bg-\[\#1b1d31\],
+.theme-midnight .bg-\[\#111322\],
+.theme-midnight .bg-\[\#181825\],
+.theme-midnight .bg-\[\#100E1D\],
+.theme-midnight .bg-\[\#2f3154\],
+.theme-midnight .bg-\[\#1c2035\],
+.theme-midnight .bg-\[\#171c38\] {
+  background: var(--mid-panel) !important;
+  border-color: var(--mid-border) !important;
+  box-shadow: var(--mid-shadow-soft), inset 0 1px 0 rgba(56, 189, 248, 0.08) !important;
+}
+
+/* Вложенные строки/таблицы и средне-серые поверхности — чуть светлее панели */
+.theme-midnight .rounded-lg.bg-\[\#1b1d31\],
+.theme-midnight .rounded-lg.bg-\[\#111322\],
+.theme-midnight .rounded-xl.bg-\[\#1b1d31\],
+.theme-midnight .bg-\[\#2a2b46\] {
+  background: var(--mid-panel-soft) !important;
+  border-color: var(--mid-border) !important;
+}
+
+/* Акцентные панели (тёплая/тревожная) — затемнённые тонированные версии */
+.theme-midnight .bg-\[\#2d2619\] {
+  background: linear-gradient(135deg, #18130a 0%, #120f08 100%) !important;
+  border-color: rgba(217, 119, 6, 0.45) !important;
+}
+.theme-midnight .bg-\[\#311b22\] {
+  background: linear-gradient(135deg, #1a0e12 0%, #140a0d 100%) !important;
+  border-color: rgba(248, 113, 113, 0.42) !important;
+}
+
+.theme-midnight .border-\[\#2a2b46\],
+.theme-midnight .border-\[\#232445\] {
+  border-color: var(--mid-border) !important;
+}
+
+/* Типографика */
+.theme-midnight .text-gray-100,
+.theme-midnight .text-gray-150,
+.theme-midnight .text-gray-200 {
+  color: var(--mid-text) !important;
+}
+.theme-midnight .text-gray-250,
+.theme-midnight .text-gray-300,
+.theme-midnight .text-gray-350 {
+  color: var(--mid-text-soft) !important;
+}
+.theme-midnight .text-gray-400,
+.theme-midnight .text-gray-500 {
+  color: var(--mid-text-muted) !important;
+}
+.theme-midnight .text-white {
+  color: #f4fbff !important;
+}
+
+/* Синий акцент → циан (текст/иконки) */
+.theme-midnight .text-blue-300,
+.theme-midnight .text-blue-400,
+.theme-midnight .text-blue-500,
+.theme-midnight .text-cyan-300,
+.theme-midnight .text-cyan-400 {
+  color: var(--mid-accent) !important;
+}
+
+/* Акцентные поверхности (кнопки) — глубокий циан, белый текст для контраста */
+.theme-midnight button.bg-blue-700,
+.theme-midnight button.bg-blue-600,
+.theme-midnight .bg-blue-700,
+.theme-midnight .bg-blue-600 {
+  background: linear-gradient(135deg, #0369a1 0%, #0e7490 100%) !important;
+  border-color: rgba(56, 189, 248, 0.5) !important;
+  color: #eafaff !important;
+  box-shadow: 0 10px 24px rgba(8, 145, 178, 0.28) !important;
+}
+.theme-midnight button.hover\:bg-blue-900:hover,
+.theme-midnight .hover\:bg-blue-900:hover,
+.theme-midnight .hover\:bg-\[\#1b1d31\]:hover {
+  background: rgba(56, 189, 248, 0.14) !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
+  color: #bff0ff !important;
+}
+.theme-midnight .bg-green-700 {
+  background: linear-gradient(135deg, #065f46 0%, #047857 100%) !important;
+  color: #f0fff8 !important;
+}
+.theme-midnight .bg-yellow-700 {
+  background: linear-gradient(135deg, #92400e 0%, #b45309 100%) !important;
+  color: #fff7e6 !important;
+}
+
+/* Формы */
+.theme-midnight input,
+.theme-midnight select,
+.theme-midnight textarea {
+  background: #0a0f1a !important;
+  color: var(--mid-text) !important;
+  border-color: var(--mid-border-strong) !important;
+}
+.theme-midnight input::placeholder,
+.theme-midnight textarea::placeholder {
+  color: #75879f !important;
+}
+.theme-midnight input:focus,
+.theme-midnight select:focus,
+.theme-midnight textarea:focus {
+  outline: none !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18) !important;
+}
+
+/* Статусные подложки/бейджи на почти-чёрном */
+.theme-midnight .bg-emerald-500\/10,
+.theme-midnight .bg-emerald-500\/20 {
+  background: rgba(16, 185, 129, 0.16) !important;
+}
+.theme-midnight .bg-amber-500\/10,
+.theme-midnight .bg-amber-500\/20,
+.theme-midnight .bg-yellow-500\/10,
+.theme-midnight .bg-yellow-500\/20 {
+  background: rgba(245, 158, 11, 0.16) !important;
+}
+.theme-midnight .bg-red-500\/10,
+.theme-midnight .bg-red-500\/20 {
+  background: rgba(248, 113, 113, 0.16) !important;
+}
+.theme-midnight .bg-gray-500\/20 {
+  background: rgba(148, 163, 184, 0.16) !important;
+}
+
+/* Статусный текст — поярче для контраста на чёрном */
+.theme-midnight .text-emerald-100,
+.theme-midnight .text-emerald-200,
+.theme-midnight .text-emerald-300,
+.theme-midnight .text-emerald-400 {
+  color: #34d399 !important;
+}
+.theme-midnight .text-amber-100,
+.theme-midnight .text-amber-200,
+.theme-midnight .text-amber-300,
+.theme-midnight .text-amber-800,
+.theme-midnight .text-yellow-100,
+.theme-midnight .text-yellow-200,
+.theme-midnight .text-yellow-300 {
+  color: #fbbf24 !important;
+}
+.theme-midnight .text-red-100,
+.theme-midnight .text-red-200,
+.theme-midnight .text-red-300,
+.theme-midnight .text-red-400,
+.theme-midnight .text-red-500 {
+  color: #f87171 !important;
+}
+
+/* Акцентные рамки */
+.theme-midnight .border-blue-400\/50,
+.theme-midnight .border-blue-500,
+.theme-midnight .border-blue-500\/40 {
+  border-color: rgba(56, 189, 248, 0.45) !important;
+}
+.theme-midnight .border-emerald-500\/30,
+.theme-midnight .border-emerald-400\/40 {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+}
+.theme-midnight .border-amber-400\/30,
+.theme-midnight .border-amber-400\/40,
+.theme-midnight .border-amber-400\/60,
+.theme-midnight .border-amber-500\/40 {
+  border-color: rgba(245, 158, 11, 0.42) !important;
+}
+.theme-midnight .border-red-500\/50,
+.theme-midnight .border-red-500\/70 {
+  border-color: rgba(248, 113, 113, 0.42) !important;
+}
+
+/* Иконки: холодное свечение */
+.theme-midnight .theme-adaptive-icon,
+.theme-midnight .theme-adaptive-icon svg {
+  filter: saturate(1.05) brightness(1.06) drop-shadow(0 0 10px rgba(56, 189, 248, 0.16));
+}
+
+/* Скроллбар */
+.theme-midnight .custom-scroll {
+  scrollbar-color: #1f3350 #05070d !important;
+}
+.theme-midnight .custom-scroll::-webkit-scrollbar {
+  background: #05070d !important;
+}
+.theme-midnight .custom-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #21405e 0%, #15293f 100%) !important;
+  border: 2px solid #05070d !important;
+}
+.theme-midnight .custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: #2c5577 !important;
+}
+
+/* Тени глубже на чёрном */
+.theme-midnight .shadow-sm {
+  box-shadow: var(--mid-shadow-soft) !important;
+}
+.theme-midnight .shadow-lg,
+.theme-midnight .shadow-xl,
+.theme-midnight .shadow-2xl {
+  box-shadow: var(--mid-shadow) !important;
+}
+
+/* VPN-панель: база кремовая (для светлой темы), под Midnight приводим к графиту */
+.theme-midnight .vpn-settings-panel {
+  border-color: rgba(56, 189, 248, 0.18);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(56, 189, 248, 0.10), transparent 36%),
+    linear-gradient(145deg, rgba(13, 19, 31, 0.98), rgba(8, 12, 20, 0.96));
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.5);
+  color: #e4eefa;
+}
+.theme-midnight .vpn-settings-header h3,
+.theme-midnight .vpn-info-tile strong {
+  color: #f2f8ff;
+}
+.theme-midnight .vpn-settings-kicker {
+  color: #5fd0f5;
+}
+.theme-midnight .vpn-settings-header p:not(.vpn-settings-kicker),
+.theme-midnight .vpn-state-badge {
+  color: #aebfd2;
+}
+.theme-midnight .vpn-info-tile,
+.theme-midnight .vpn-state-badge,
+.theme-midnight .vpn-secondary-button,
+.theme-midnight .vpn-ghost-button {
+  background: rgba(56, 189, 248, 0.06);
+  border-color: rgba(56, 189, 248, 0.16);
+  color: #cfe0f2;
+}
+.theme-midnight .vpn-info-tile span {
+  color: #7f93ab;
+}
+.theme-midnight .vpn-primary-button {
+  background: linear-gradient(135deg, #0369a1, #0e7490);
+  color: #eafaff;
+  box-shadow: 0 14px 28px rgba(8, 145, 178, 0.28);
+}
+
+/* Светлая (тёплая) тема: добор поверхностей, пропущенных в основном блоке,
+   чтобы средне-тёмные indigo-hex не «выпирали» тёмными пятнами на светлом. */
+.theme-light .bg-\[\#2f3154\],
+.theme-light .bg-\[\#1c2035\],
+.theme-light .bg-\[\#171c38\],
+.theme-light .bg-\[\#12152a\],
+.theme-light .bg-\[\#0f1120\],
+.theme-light .bg-\[\#1b1020\],
+.theme-light .bg-\[\#0d0f1b\] {
+  background: var(--light-panel) !important;
+  border-color: var(--light-border) !important;
+}
+.theme-light .bg-\[\#2a2b46\] {
+  background: var(--light-panel-soft) !important;
+  border-color: var(--light-border) !important;
+}
+.theme-light .text-amber-800 {
+  color: #704c2d !important;
+}
+
+/* ===============================
+   Тема «День» (Day): прохладный дневной свет — чистые холодные тона,
+   небесно-голубой акцент. Светлое семейство: ремаппит тёмные hex-классы
+   в светлую палитру через !important (как .theme-light, но в холодных тонах).
+   =============================== */
+.theme-day {
+  --day-bg: #eaf1fa;
+  --day-bg-2: #f5f9fd;
+  --day-panel: rgba(255, 255, 255, 0.94);
+  --day-panel-solid: #ffffff;
+  --day-panel-soft: #f2f7fc;
+  --day-panel-muted: #e7f0fa;
+  --day-border: #d4e0ee;
+  --day-border-strong: #bccfe4;
+  --day-text: #0f2034;
+  --day-text-soft: #38516c;
+  --day-text-muted: #5c7185;
+  --day-accent: #0284c7;
+  --day-accent-2: #0ea5e9;
+  --day-shadow: 0 16px 40px rgba(15, 44, 84, 0.10);
+  --day-shadow-soft: 0 8px 22px rgba(15, 44, 84, 0.07);
+  color: var(--day-text);
+  background:
+    radial-gradient(circle at 14% 6%, rgba(2, 132, 199, 0.12), transparent 30%),
+    radial-gradient(circle at 84% 12%, rgba(14, 165, 233, 0.10), transparent 32%),
+    linear-gradient(150deg, #e9f1fb 0%, #f6fbff 52%, #e8f3fe 100%);
+}
+
+.theme-day .app-shell {
+  background:
+    radial-gradient(circle at 80% 0%, rgba(2, 132, 199, 0.10), transparent 34%),
+    linear-gradient(150deg, #e8f1fb 0%, #f6fbff 58%, #e9f3fe 100%) !important;
+}
+
+.theme-day main.app-main {
+  background:
+    radial-gradient(circle at 16% 10%, rgba(14, 165, 233, 0.10), transparent 28%),
+    radial-gradient(circle at 88% 4%, rgba(2, 132, 199, 0.09), transparent 30%),
+    linear-gradient(150deg, #f3f8fd 0%, #e9f1fa 100%) !important;
+}
+
+.theme-day aside.app-sidebar {
+  background: linear-gradient(180deg, #f6fafe 0%, #e9f2fc 100%) !important;
+  border-right: 1px solid rgba(188, 207, 228, 0.9) !important;
+  box-shadow: 14px 0 36px rgba(15, 44, 84, 0.07) !important;
+}
+
+.theme-day .app-content {
+  color: var(--day-text) !important;
+}
+
+/* Панели: тёмные hex-блоки → светлые карточки */
+.theme-day .bg-darkblue,
+.theme-day .bg-\[\#131522\],
+.theme-day .bg-\[\#16182a\],
+.theme-day .bg-\[\#22243c\],
+.theme-day .bg-\[\#1a1b2d\],
+.theme-day .bg-\[\#1b1d31\],
+.theme-day .bg-\[\#111322\],
+.theme-day .bg-\[\#181825\],
+.theme-day .bg-\[\#100E1D\],
+.theme-day .bg-\[\#2f3154\],
+.theme-day .bg-\[\#1c2035\],
+.theme-day .bg-\[\#171c38\],
+.theme-day .bg-\[\#12152a\],
+.theme-day .bg-\[\#0f1120\],
+.theme-day .bg-\[\#1b1020\],
+.theme-day .bg-\[\#0d0f1b\] {
+  background: var(--day-panel) !important;
+  border-color: var(--day-border) !important;
+  box-shadow: var(--day-shadow-soft) !important;
+  backdrop-filter: blur(8px);
+}
+
+/* Вложенные строки/средне-серые поверхности — чуть холоднее белого */
+.theme-day .rounded-lg.bg-\[\#1b1d31\],
+.theme-day .rounded-lg.bg-\[\#111322\],
+.theme-day .rounded-xl.bg-\[\#1b1d31\],
+.theme-day .bg-\[\#2a2b46\] {
+  background: var(--day-panel-soft) !important;
+  border-color: var(--day-border) !important;
+}
+
+/* Акцентные панели (тёплая/тревожная) — мягкие светлые версии */
+.theme-day .bg-\[\#2d2619\] {
+  background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%) !important;
+  border-color: #f3cd8a !important;
+}
+.theme-day .bg-\[\#311b22\] {
+  background: linear-gradient(135deg, #fff1f2 0%, #fff7f7 100%) !important;
+  border-color: #f3a6ae !important;
+}
+
+.theme-day .border-\[\#2a2b46\],
+.theme-day .border-\[\#232445\] {
+  border-color: var(--day-border) !important;
+}
+
+/* Типографика */
+.theme-day .text-gray-100,
+.theme-day .text-gray-150,
+.theme-day .text-gray-200 {
+  color: var(--day-text) !important;
+}
+.theme-day .text-gray-250,
+.theme-day .text-gray-300,
+.theme-day .text-gray-350 {
+  color: var(--day-text-soft) !important;
+}
+.theme-day .text-gray-400,
+.theme-day .text-gray-500 {
+  color: var(--day-text-muted) !important;
+}
+.theme-day .text-white {
+  color: #ffffff !important;
+}
+
+/* Синий/циан акцент — насыщенный небесный */
+.theme-day .text-blue-300,
+.theme-day .text-blue-400,
+.theme-day .text-blue-500,
+.theme-day .text-cyan-300,
+.theme-day .text-cyan-400 {
+  color: #0369a1 !important;
+}
+
+/* Акцентные кнопки — небесно-голубой градиент, белый текст */
+.theme-day button.bg-blue-700,
+.theme-day button.bg-blue-600,
+.theme-day .bg-blue-700,
+.theme-day .bg-blue-600 {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  border-color: rgba(2, 132, 199, 0.5) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 24px rgba(2, 132, 199, 0.22) !important;
+}
+.theme-day button.hover\:bg-blue-900:hover,
+.theme-day .hover\:bg-blue-900:hover,
+.theme-day .hover\:bg-\[\#1b1d31\]:hover {
+  background: #e2f0fb !important;
+  border-color: rgba(2, 132, 199, 0.4) !important;
+  color: #075985 !important;
+}
+.theme-day .bg-green-700 {
+  background: linear-gradient(135deg, #065f46 0%, #047857 100%) !important;
+  color: #ffffff !important;
+}
+.theme-day .bg-yellow-700 {
+  background: linear-gradient(135deg, #92400e 0%, #b45309 100%) !important;
+  color: #ffffff !important;
+}
+
+/* Формы */
+.theme-day input,
+.theme-day select,
+.theme-day textarea {
+  background: #ffffff !important;
+  color: var(--day-text) !important;
+  border-color: var(--day-border-strong) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.theme-day input::placeholder,
+.theme-day textarea::placeholder {
+  color: #8195ab !important;
+}
+.theme-day input:focus,
+.theme-day select:focus,
+.theme-day textarea:focus {
+  outline: none !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.16) !important;
+}
+
+/* Статусные подложки */
+.theme-day .bg-emerald-500\/10,
+.theme-day .bg-emerald-500\/20 {
+  background: #d6f3e4 !important;
+}
+.theme-day .bg-amber-500\/10,
+.theme-day .bg-amber-500\/20,
+.theme-day .bg-yellow-500\/10,
+.theme-day .bg-yellow-500\/20 {
+  background: #fdefc8 !important;
+}
+.theme-day .bg-red-500\/10,
+.theme-day .bg-red-500\/20 {
+  background: #fde0e0 !important;
+}
+.theme-day .bg-gray-500\/20 {
+  background: #e2eaf2 !important;
+}
+
+/* Статусный текст — тёмные, читаемые на светлом */
+.theme-day .text-emerald-100,
+.theme-day .text-emerald-200,
+.theme-day .text-emerald-300,
+.theme-day .text-emerald-400 {
+  color: #047857 !important;
+}
+.theme-day .text-amber-100,
+.theme-day .text-amber-200,
+.theme-day .text-amber-300,
+.theme-day .text-amber-800,
+.theme-day .text-yellow-100,
+.theme-day .text-yellow-200,
+.theme-day .text-yellow-300 {
+  color: #92400e !important;
+}
+.theme-day .text-red-100,
+.theme-day .text-red-200,
+.theme-day .text-red-300,
+.theme-day .text-red-400,
+.theme-day .text-red-500 {
+  color: #c0271f !important;
+}
+
+/* Акцентные рамки */
+.theme-day .border-blue-400\/50,
+.theme-day .border-blue-500,
+.theme-day .border-blue-500\/40 {
+  border-color: rgba(2, 132, 199, 0.4) !important;
+}
+.theme-day .border-emerald-500\/30,
+.theme-day .border-emerald-400\/40 {
+  border-color: rgba(5, 150, 105, 0.38) !important;
+}
+.theme-day .border-amber-400\/30,
+.theme-day .border-amber-400\/40,
+.theme-day .border-amber-400\/60,
+.theme-day .border-amber-500\/40 {
+  border-color: rgba(180, 83, 9, 0.4) !important;
+}
+.theme-day .border-red-500\/50,
+.theme-day .border-red-500\/70 {
+  border-color: rgba(192, 39, 31, 0.4) !important;
+}
+
+/* Иконки: аккуратная тень вместо серой мутности */
+.theme-day .theme-adaptive-icon,
+.theme-day .theme-adaptive-icon svg {
+  filter: saturate(1.12) contrast(1.08) brightness(0.94) drop-shadow(0 5px 10px rgba(15, 44, 84, 0.12));
+}
+.theme-day img.opacity-10 {
+  opacity: 0.07 !important;
+}
+
+/* Боковая панель погоды */
+.theme-day .app-sidebar h1 {
+  color: #0c1b2e !important;
+}
+.theme-day .app-sidebar .addr {
+  color: #5c7185 !important;
+}
+
+/* Скроллбар */
+.theme-day .custom-scroll {
+  scrollbar-color: #b9cde2 #e9f1fa !important;
+}
+.theme-day .custom-scroll::-webkit-scrollbar {
+  background: #e9f1fa !important;
+}
+.theme-day .custom-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #b9cde2 0%, #9bb6d2 100%) !important;
+  border: 2px solid #e9f1fa !important;
+}
+.theme-day .custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: #86a4c4 !important;
+}
+
+/* Тени */
+.theme-day .shadow-sm {
+  box-shadow: var(--day-shadow-soft) !important;
+}
+.theme-day .shadow-lg,
+.theme-day .shadow-xl,
+.theme-day .shadow-2xl {
+  box-shadow: var(--day-shadow) !important;
+}
+
+/* VPN-панель: база кремовая (тёплая) — под «День» делаем прохладно-белой */
+.theme-day .vpn-settings-panel {
+  border-color: rgba(2, 132, 199, 0.18);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(2, 132, 199, 0.10), transparent 36%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(238, 245, 252, 0.96));
+  box-shadow: 0 20px 46px rgba(15, 44, 84, 0.10);
+  color: #14273c;
+}
+.theme-day .vpn-settings-header h3,
+.theme-day .vpn-info-tile strong {
+  color: #0f2235;
+}
+.theme-day .vpn-settings-kicker {
+  color: #0369a1;
+}
+.theme-day .vpn-settings-header p:not(.vpn-settings-kicker),
+.theme-day .vpn-state-badge {
+  color: #51647a;
+}
+.theme-day .vpn-info-tile,
+.theme-day .vpn-state-badge,
+.theme-day .vpn-secondary-button,
+.theme-day .vpn-ghost-button {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(2, 132, 199, 0.16);
+  color: #33485e;
+}
+.theme-day .vpn-info-tile span {
+  color: #6a7f93;
+}
+.theme-day .vpn-primary-button {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #ffffff;
+  box-shadow: 0 14px 28px rgba(2, 132, 199, 0.24);
 }

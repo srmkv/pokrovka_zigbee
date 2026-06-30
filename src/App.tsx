@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import SideBar from "./components/SideBar";
 import MainContent from "./components/MainContent";
 import { UiPopupProvider } from "./contexts/UiPopupContext";
+import { ThemeId, isThemeId } from "./types/theme";
 const App = () => {
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
+  const [theme, setTheme] = useState<ThemeId>(() => {
     const saved = localStorage.getItem("ui-theme");
-    return saved === "light" ? "light" : "dark";
+    return isThemeId(saved) ? saved : "dark";
   });
   // Боковая панель: на десктопе всегда видима, на мобильном — выезжающий drawer.
   const [navOpen, setNavOpen] = useState(false);
@@ -24,7 +25,7 @@ const App = () => {
 
   return (
     <UiPopupProvider>
-    <div className={`app-shell flex w-full h-screen overflow-x-hidden ${theme === "light" ? "theme-light" : "theme-dark"}`}>
+    <div className={`app-shell flex w-full h-screen overflow-x-hidden theme-${theme}`}>
       {/* Затемнение под мобильным drawer */}
       {navOpen && (
         <div

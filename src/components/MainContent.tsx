@@ -30,6 +30,7 @@ import VpnSettingsPanel from "./Settings/VpnSettingsPanel";
 import ZigbeePanel, { DeviceLinksPanel } from "./Zigbee/ZigbeePanel";
 import IrRemotesPanel from "./IR/IrRemotesPanel";
 import IrControls from "./IR/IrControls";
+import { ThemeId } from "../types/theme";
 
 type TabId = "weather" | "control" | "automation" | "sensors" | "system" | "settings" | "traffic";
 
@@ -44,8 +45,8 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 interface MainContentProps {
-  theme: "dark" | "light";
-  setTheme: (theme: "dark" | "light") => void;
+  theme: ThemeId;
+  setTheme: (theme: ThemeId) => void;
   onOpenNav?: () => void;
 }
 
@@ -266,7 +267,7 @@ const MainContent: React.FC<MainContentProps> = ({ theme, setTheme, onOpenNav })
             <h3 className="text-2xl font-bold text-gray-150">Настройки интерфейса</h3>
             <p className="text-sm text-gray-400 mt-2">Выбери тему отображения панели управления.</p>
 
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <button
                 type="button"
                 onClick={() => setTheme("dark")}
@@ -297,6 +298,40 @@ const MainContent: React.FC<MainContentProps> = ({ theme, setTheme, onOpenNav })
                     <div className="h-16 rounded-lg bg-[#eef3f8]"></div>
                     <div className="h-16 rounded-lg bg-[#eef3f8]"></div>
                     <div className="h-16 rounded-lg bg-[#eef3f8]"></div>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTheme("midnight")}
+                className={`rounded-2xl border p-5 text-left transition ${theme === "midnight" ? "border-cyan-400 bg-[#0c111d] shadow-lg" : "border-[#2a2b46] bg-[#131522]"}`}
+              >
+                <div className="text-lg font-semibold text-gray-150">Ночь</div>
+                <div className="text-sm text-gray-400 mt-1">Почти чёрный фон и холодный циан — для ночного режима панели.</div>
+                <div className="mt-4 rounded-xl border border-[#16324a] bg-[#05070d] p-4">
+                  <div className="h-3 w-24 rounded bg-cyan-400 mb-3"></div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="h-16 rounded-lg bg-[#0d1320]"></div>
+                    <div className="h-16 rounded-lg bg-[#0d1320]"></div>
+                    <div className="h-16 rounded-lg bg-[#0d1320]"></div>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTheme("day")}
+                className={`rounded-2xl border p-5 text-left transition ${theme === "day" ? "border-sky-500 bg-[#eef4fb] shadow-lg" : "border-[#2a2b46] bg-[#131522]"}`}
+              >
+                <div className="text-lg font-semibold text-gray-150">День</div>
+                <div className="text-sm text-gray-400 mt-1">Прохладный дневной свет: чистые холодные тона и небесно-голубой акцент.</div>
+                <div className="mt-4 rounded-xl border border-[#cdddee] bg-[#f7fafe] p-4">
+                  <div className="h-3 w-24 rounded bg-sky-500 mb-3"></div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="h-16 rounded-lg bg-[#e3edf8]"></div>
+                    <div className="h-16 rounded-lg bg-[#e3edf8]"></div>
+                    <div className="h-16 rounded-lg bg-[#e3edf8]"></div>
                   </div>
                 </div>
               </button>
